@@ -2,6 +2,7 @@
 #include "esp32-hal-ledc.h"
 #include "esp32-hal-log.h"
 #include "esp_camera.h"
+#include "esp_http_server.h"
 #include "hal/ledc_types.h"
 #include "sensor.h"
 
@@ -126,4 +127,21 @@ void setupCamera() {
 void setupLedFlash(int pin) {
   ledcSetup(LEDC_CHANNEL_7, 5000, 8);
   ledcAttachPin(pin, LEDC_CHANNEL_7);
+}
+
+httpd_handle_t startStreamServer() {
+  httpd_handle_t server = NULL;
+  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  config.server_port += 1;
+  config.ctrl_port += 1;
+
+  if (httpd_start(&server, &config) == ESP_OK) {
+    httpd_uri_t stream_uri = {.uri = "/",
+                              .method = HTTP_GET,
+                              .handler = streamHandler,
+                              .user_ctx = NULL};
+    httpd_register_uri_handler(server, &stream_uri);
+  }
+
+  return server;
 }

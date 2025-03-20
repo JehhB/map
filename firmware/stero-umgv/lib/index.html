@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UMGV</title>
+  </head>
+  <body>
+    <form action="/conf" method="post" enctype="text/plain">
+      <input type="checkbox" id="softap" name="softap" />
+      <label for="softap">SoftAP mode</label><br />
+      <label for="ssid">SSID</label>
+      <input required type="text" id="ssid" name="ssid" /><br />
+      <label for="pass">Password</label>
+      <input required type="text" id="pass" name="pass" /><br />
+      <input type="submit" value="Submit" />
+    </form>
+  </body>
+</html>
