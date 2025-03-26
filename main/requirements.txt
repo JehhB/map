@@ -1,3 +1,16 @@
 PyOpenGL==3.1.9
 PyOpenGL-accelerate==3.1.9
 pyopengltk==0.0.4
+numpy==2.2.4
+opencv-contrib-python==4.11.0.86
+PyOpenGL==3.1.9
+PyOpenGL-accelerate==3.1.9
+pyopengltk==0.0.4
+Pypubsub==4.0.3
+numpy==2.2.4
+opencv-contrib-python==4.11.0.86
+pillow==11.1.0
+PyOpenGL==3.1.9
+PyOpenGL-accelerate==3.1.9
+pyopengltk==0.0.4
+Pypubsub==4.0.3
