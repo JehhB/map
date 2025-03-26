@@ -1,15 +1,27 @@
+from typing import final
+
+from app.Container import Container
+from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main
+from app.ui.MainGl import MainGl
 from app.ui.MenuBar import MenuBar
+from stereo_vslam import StereoVslamExtension
 
 
+@final
 class Application:
     def __init__(self) -> None:
-        self.main_window = Main()
-        self.menu_bar = MenuBar()
-        self.main_window.config(menu=self.menu_bar)
+        self.container = Container()
+
+        self.container.register(Main)
+        self.container.register(MenuBar)
+        self.container.register(MainGl)
+        self.container.register(ExtensionManager)
+        self.container.register(StereoVslamExtension)
 
     def mainloop(self):
-        self.main_window.mainloop()
+        main = self.container[Main]
+        main.mainloop()
 
 
 application = Application()

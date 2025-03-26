@@ -1,9 +1,42 @@
 import tkinter as tk
+from typing import override
+
+from app.Container import AbstractModule, Container, ModuleDefinition
+from app.ui.Main import Main
 
 
-class MenuBar(tk.Menu):
-    def __init__(self, master: tk.Misc | None = None, **kwargs) -> None:
+class MenuBar(AbstractModule, tk.Menu):
+    _container: Container
+    file_menu: tk.Menu
+    edit_menu: tk.Menu
+    navigate_menu: tk.Menu
+    extension_menu: tk.Menu
+
+    @override
+    @staticmethod
+    def KEY():
+        return "ui.menubar"
+
+    @override
+    @classmethod
+    def DEFINITION(cls) -> ModuleDefinition["MenuBar"]:
+        return MenuBar.factory, [Main]
+
+    @staticmethod
+    def factory(container: Container):
+        main = container[Main]
+
+        menu_bar = MenuBar(container, main)
+        _ = main.config(menu=menu_bar)
+
+        return menu_bar
+
+    def __init__(
+        self, container: Container, master: tk.Misc | None = None, **kwargs
+    ) -> None:
         super().__init__(master, **kwargs)
+
+        self._container = container
 
         self.file_menu = tk.Menu(self, tearoff=0)
         self.file_menu.add_command(label="Open", command=self.file_open)
@@ -41,6 +74,7 @@ class MenuBar(tk.Menu):
         self.extension_menu.add_command(
             label="Manage extension", command=self.extension_manage
         )
+        self.extension_menu.add_separator()
         self.add_cascade(label="Extensions", menu=self.extension_menu)
 
     def file_open(self):
