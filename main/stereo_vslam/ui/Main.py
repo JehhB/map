@@ -16,14 +16,22 @@ class Main(tk.Toplevel):
     DEFAULT_VIEWER_WIDTH: int = 240
     DEFAULT_VIEWER_HEIGHT: int = 180
 
-    left_image: tk.Canvas
-    right_image: tk.Canvas
+    DEFAULT_DISPARITY_WIDTH: int = 800
+    DEFAULT_DISPARITY_HEIGHT: int = 600
+
+    left_canvas: tk.Canvas
+    right_canvas: tk.Canvas
+    disparity_canvas: tk.Canvas
 
     chessboard_x: tk.IntVar
     chessboard_y: tk.IntVar
     chessboard_size: tk.DoubleVar
     calibration_sample: tk.IntVar
     calibration_progress: int
+
+    inspect_x: tk.IntVar
+    inspect_y: tk.IntVar
+    inspect_disparity: tk.DoubleVar
 
     def __init__(
         self,
@@ -41,21 +49,21 @@ class Main(tk.Toplevel):
 
         viewer_frame = tk.LabelFrame(self, text="Videos")
 
-        self.left_image = tk.Canvas(
+        self.left_canvas = tk.Canvas(
             viewer_frame,
             width=Main.DEFAULT_VIEWER_WIDTH,
             height=Main.DEFAULT_VIEWER_HEIGHT,
             bg="black",
         )
-        self.left_image.pack(pady=4, expand=tk.FALSE)
+        self.left_canvas.pack(pady=4, expand=tk.FALSE)
 
-        self.right_image = tk.Canvas(
+        self.right_canvas = tk.Canvas(
             viewer_frame,
             width=Main.DEFAULT_VIEWER_WIDTH,
             height=Main.DEFAULT_VIEWER_HEIGHT,
             bg="black",
         )
-        self.right_image.pack(pady=4, expand=tk.FALSE)
+        self.right_canvas.pack(pady=4, expand=tk.FALSE)
 
         viewer_frame.grid(row=0, column=0, pady=4, ipady=4, padx=8, ipadx=8)
 
@@ -110,7 +118,62 @@ class Main(tk.Toplevel):
         )
         _ = calibration_frame.columnconfigure((1, 2), weight=1)
 
-        _ = self.columnconfigure(1, weight=1)
+        self.inspect_x = tk.IntVar(self, value=None)
+        self.inspect_y = tk.IntVar(self, value=None)
+        self.inspect_disparity = tk.DoubleVar(self, value=None)
+
+        inspect_frame = tk.LabelFrame(self, text="Inspect")
+
+        tk.Label(inspect_frame, text="Coordinate").grid(
+            row=0, column=0, pady=4, padx=8, sticky="e"
+        )
+
+        tk.Entry(
+            inspect_frame,
+            textvariable=self.inspect_x,
+            width=0,
+            justify=tk.RIGHT,
+            state="readonly",
+        ).grid(row=0, column=1, pady=4, padx=0, sticky="ew")
+
+        tk.Entry(
+            inspect_frame,
+            textvariable=self.inspect_y,
+            width=0,
+            justify=tk.RIGHT,
+            state="readonly",
+        ).grid(row=0, column=2, pady=4, padx=4, sticky="ew")
+
+        tk.Label(inspect_frame, text="Disparity").grid(
+            row=1, column=0, pady=4, padx=8, sticky="e"
+        )
+
+        tk.Entry(
+            inspect_frame,
+            textvariable=self.inspect_disparity,
+            width=0,
+            justify=tk.RIGHT,
+            state="readonly",
+        ).grid(row=1, column=1, pady=4, padx=4, columnspan=2, sticky="ew")
+
+        inspect_frame.grid(
+            row=2, column=0, pady=4, ipady=4, padx=8, ipadx=8, sticky="new"
+        )
+
+        _ = inspect_frame.columnconfigure((1, 2), weight=1)
+
+        disparity_frame = tk.LabelFrame(self, text="Disparity")
+
+        self.disparity_canvas = tk.Canvas(
+            disparity_frame,
+            width=Main.DEFAULT_DISPARITY_WIDTH,
+            height=Main.DEFAULT_DISPARITY_HEIGHT,
+            bg="black",
+        )
+
+        self.disparity_canvas.pack(padx=8, pady=8)
+
+        disparity_frame.grid(row=0, column=1, padx=8, pady=4, rowspan=3, sticky="nwes")
 
     def update_canvas(self, canvas: tk.Canvas, image: Image):
         image = image.resize((Main.DEFAULT_VIEWER_WIDTH, Main.DEFAULT_VIEWER_HEIGHT))

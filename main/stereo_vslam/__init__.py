@@ -61,5 +61,14 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             self.container[AppMain],
         )
 
+        def on_close():
+            if self.main_window is None:
+                return
+
+            self.main_window.destroy()
+            self.main_window = None
+
+        self.main_window.protocol("WM_DELETE_WINDOW", on_close)
+
     def process_images(self, left_image: Image, right_image: Image):
         pass
