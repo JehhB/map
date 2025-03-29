@@ -1,5 +1,7 @@
 import tkinter as tk
-from typing import override
+from typing import Optional
+
+from typing_extensions import override
 
 from app.Container import AbstractModule, Container, ModuleDefinition
 
@@ -24,12 +26,12 @@ class Main(AbstractModule, tk.Tk):
     def __init__(
         self,
         container: Container,
-        screenName: str | None = None,
-        baseName: str | None = None,
+        screenName: Optional[str] = None,
+        baseName: Optional[str] = None,
         className: str = "Tk",
         useTk: bool = True,
         sync: bool = False,
-        use: str | None = None,
+        use: Optional[str] = None,
     ) -> None:
         super().__init__(screenName, baseName, className, useTk, sync, use)
         self._container = container

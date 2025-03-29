@@ -1,5 +1,7 @@
 import tkinter as tk
-from typing import override
+from typing import Optional
+
+from typing_extensions import override
 
 from app.Container import AbstractModule, Container, ModuleDefinition
 from app.ui.Main import Main
@@ -32,7 +34,7 @@ class MenuBar(AbstractModule, tk.Menu):
         return menu_bar
 
     def __init__(
-        self, container: Container, master: tk.Misc | None = None, **kwargs
+        self, container: Container, master: Optional[tk.Misc] = None, **kwargs
     ) -> None:
         super().__init__(master, **kwargs)
 

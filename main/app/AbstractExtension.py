@@ -1,15 +1,15 @@
 from abc import ABC
-from typing import Callable, TypeAlias
+from typing import Callable, Dict, Set
 
 from app.AbstractEvent import AbstractEvent
 from app.Container import SetterInjectable
 
-EventHandler: TypeAlias = Callable[[AbstractEvent], None]
+EventHandler = Callable[[AbstractEvent], None]
 
 
 class AbstractExtension(SetterInjectable, ABC):
     def __init__(self) -> None:
-        self._event_handlers: dict[str, set[EventHandler]] = dict()
+        self._event_handlers: Dict[str, Set[EventHandler]] = dict()
         super().__init__()
 
     def add_event_handler(self, event: str, event_handler: EventHandler):

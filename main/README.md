@@ -1,30 +1,35 @@
 # Main Software
 
+## Support
+
+Tested on `Ubuntu 20.04 Focal Fosa` with `Python 3.8.10`
+
 ## How to use
 
 1.  Install packages
-    1. Follow [ROS installation guide](http://wiki.ros.org/Installation/Ubuntu) and download `ros-noetic-ros-base`, `ros-noetic-rtabmap-ros`, and `ros-noetic-stereo-image-proc`
-    2. Follow [Miniconda installation](https://www.anaconda.com/docs/getting-started/miniconda/install)
-2.  Prepare environments
+    Follow [ROS installation guide](http://wiki.ros.org/Installation/Ubuntu)
 
     ```sh
-    source ~/miniconda3/bin/activate
-    source /opt/ros/noetic/setup.zsh
-
-    conda create --prefix .venv python=3.13
-    conda activate ./.venv
+    sudo apt install ros-noetic-ros-base ros-noetic-rtabmap-ros ros-noetic-stereo-image-proc
     ```
 
-3.  Install dependencies
+2.  Prepare Environment
 
     ```sh
+    python -m venv .venv
+
+    source /opt/ros/noetic/setup.bash
+    source .venv/bin/activate
+
     pip install PyOpenGL PyOpenGL-accelerate pyopengltk opencv-contrib-python pillow pypubsub rospy cv_bridge sensor_msgs rospkg
     ```
 
-4.  Run processes
+3.  Run processes
 
     ```sh
+    roscore
     ROS_NAMESPACE='stereo_camera' rosrun stereo_image_proc stereo_image_proc
     roslaunch rtabmap_ros rtabmap.launch stereo:=true rviz:=false rtabmap_viz:=false
+
     python main.py
     ```

@@ -1,8 +1,8 @@
 import tkinter as tk
-from typing import override
 
 from OpenGL import GL
 from pyopengltk import OpenGLFrame
+from typing_extensions import override
 
 from app.Container import AbstractModule, Container, ModuleDefinition
 from app.ui.Main import Main

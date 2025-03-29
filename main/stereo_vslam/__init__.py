@@ -1,7 +1,6 @@
-from typing import Self, override
-
 from PIL.Image import Image
 from pubsub import pub
+from typing_extensions import Self, override
 
 from app.AbstractEvent import AbstractEvent
 from app.AbstractExtension import AbstractExtension

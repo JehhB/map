@@ -1,5 +1,5 @@
 import tkinter as tk
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from PIL.Image import Image
 
@@ -34,7 +34,7 @@ class Main(tk.Toplevel):
     def __init__(
         self,
         extension: "StereoVslamExtension",
-        master: tk.Misc | None = None,
+        master: Optional[tk.Misc] = None,
         *args,
         **kwargs
     ) -> None:

@@ -1,4 +1,6 @@
-from typing import Self, override
+from typing import Dict, Type, TypeVar
+
+from typing_extensions import Self, override
 
 from app.AbstractEvent import AbstractEvent
 from app.AbstractExtension import AbstractExtension
@@ -15,12 +17,15 @@ class InitEvent(AbstractEvent):
     pass
 
 
+AbstractExtensionImpl = TypeVar("AbstractExtensionImpl", bound="AbstractExtension")
+
+
 class ExtensionManager(AbstractModule, SetterInjectable):
     @staticmethod
-    def defaultFactory[
-        T: AbstractExtension
-    ](name: str, constructor: type[T]) -> ModuleFactory[T]:
-        def factory(container: Container) -> T:
+    def defaultFactory(
+        name: str, constructor: Type[AbstractExtensionImpl]
+    ) -> ModuleFactory[AbstractExtensionImpl]:
+        def factory(container: Container) -> AbstractExtensionImpl:
             extension = constructor()
             extension.set_container(container)
 
@@ -31,7 +36,7 @@ class ExtensionManager(AbstractModule, SetterInjectable):
 
         return factory
 
-    _extensions: dict[str, AbstractExtension]
+    _extensions: Dict[str, AbstractExtension]
 
     @override
     @staticmethod
