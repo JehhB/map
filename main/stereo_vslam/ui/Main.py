@@ -17,6 +17,8 @@ class Main(tk.Toplevel):
     DEFAULT_DISPARITY_WIDTH: int = 800
     DEFAULT_DISPARITY_HEIGHT: int = 600
 
+    menu_bar: MenuBar
+
     left_canvas: tk.Canvas
     right_canvas: tk.Canvas
     disparity_canvas: tk.Canvas
@@ -43,7 +45,7 @@ class Main(tk.Toplevel):
         self.title("Stereo VSLAM")
 
         self.menu_bar = MenuBar(self, extension)
-        self.config(menu=self.menu_bar)
+        _ = self.config(menu=self.menu_bar)
 
         viewer_frame = tk.LabelFrame(self, text="Videos")
 
@@ -77,34 +79,49 @@ class Main(tk.Toplevel):
             row=0, column=0, pady=4, padx=8, sticky="e"
         )
 
-        tk.Entry(
-            calibration_frame, textvariable=self.chessboard_x, width=0, justify=tk.RIGHT
+        tk.Spinbox(
+            calibration_frame,
+            textvariable=self.chessboard_x,
+            width=0,
+            justify=tk.RIGHT,
+            from_=2,
+            to=32,
         ).grid(row=0, column=1, pady=4, padx=0, sticky="ew")
 
-        tk.Entry(
-            calibration_frame, textvariable=self.chessboard_y, width=0, justify=tk.RIGHT
+        tk.Spinbox(
+            calibration_frame,
+            textvariable=self.chessboard_y,
+            width=0,
+            justify=tk.RIGHT,
+            from_=2,
+            to=32,
         ).grid(row=0, column=2, pady=4, padx=4, sticky="ew")
 
         tk.Label(calibration_frame, text="Square size (in mm)").grid(
             row=1, column=0, pady=4, padx=8, sticky="e"
         )
 
-        tk.Entry(
+        tk.Spinbox(
             calibration_frame,
             textvariable=self.chessboard_size,
             width=0,
             justify=tk.RIGHT,
+            from_=0.02,
+            to=100.0,
+            increment=0.02,
         ).grid(row=1, column=1, pady=4, padx=4, columnspan=2, sticky="ew")
 
         tk.Label(calibration_frame, text="Number of samples").grid(
             row=2, column=0, pady=4, padx=8, sticky="e"
         )
 
-        tk.Entry(
+        tk.Spinbox(
             calibration_frame,
             textvariable=self.calibration_sample,
             width=0,
             justify=tk.RIGHT,
+            from_=1,
+            to=100,
         ).grid(row=2, column=1, pady=4, padx=4, columnspan=2, sticky="ew")
 
         tk.Button(

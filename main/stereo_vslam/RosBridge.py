@@ -1,4 +1,5 @@
 import numpy as np
+import rosgraph
 from cv_bridge import CvBridge
 from PIL.Image import Image
 from rospy import Publisher, Time
@@ -15,6 +16,9 @@ class RosBridge:
     right_camera_info_pub: Publisher
 
     def __init__(self):
+        if not rosgraph.is_master_online():
+            raise RuntimeError("roscore is not running")
+
         self.bridge = CvBridge()
 
         self.left_image_pub = Publisher(

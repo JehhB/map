@@ -1,5 +1,6 @@
-from abc import ABC
-from typing import Callable, Dict, Set
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Set
 
 from reactivex.subject import BehaviorSubject
 
@@ -9,6 +10,13 @@ from app.events.DeinitEvent import DeinitEvent
 from app.events.InitEvent import InitEvent
 
 EventHandler = Callable[[AbstractEvent], None]
+
+
+@dataclass
+class ExtensionMetadata:
+    name: str
+    description: str
+    dependencies: List[str]
 
 
 class AbstractExtension(SetterInjectable, ABC):
@@ -46,20 +54,29 @@ class AbstractExtension(SetterInjectable, ABC):
         for handler in self._event_handlers[event]:
             handler(eventObject)
 
-    def enable(self) -> bool:
+    def enable(self) -> InitEvent:
         event = InitEvent()
         self.emit_event("init", event)
 
         if event.is_success:
             self.active_subject.on_next(True)
 
-        return event.is_success
+        return event
 
-    def disable(self) -> bool:
+    def disable(self) -> DeinitEvent:
         event = DeinitEvent()
         self.emit_event("deinit", event)
 
         if event.is_success:
             self.active_subject.on_next(False)
 
-        return event.is_success
+        return event
+
+    @property
+    def is_active(self):
+        self.active_subject.value
+
+    @property
+    @abstractmethod
+    def metadata(self) -> ExtensionMetadata:
+        raise NotImplementedError()

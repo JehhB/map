@@ -35,3 +35,4 @@ class Main(AbstractModule, tk.Tk):
     ) -> None:
         super().__init__(screenName, baseName, className, useTk, sync, use)
         self._container = container
+        self.title("Map")

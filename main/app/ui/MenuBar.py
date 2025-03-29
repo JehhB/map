@@ -4,7 +4,9 @@ from typing import Optional
 from typing_extensions import override
 
 from app.Container import AbstractModule, Container, ModuleDefinition
+from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main
+from app.ui.ManageExtension import ManageExtension
 
 
 class MenuBar(AbstractModule, tk.Menu):
@@ -14,6 +16,8 @@ class MenuBar(AbstractModule, tk.Menu):
     navigate_menu: tk.Menu
     extension_menu: tk.Menu
 
+    manage_extension_window: Optional[ManageExtension]
+
     @override
     @staticmethod
     def KEY():
@@ -22,7 +26,7 @@ class MenuBar(AbstractModule, tk.Menu):
     @override
     @classmethod
     def DEFINITION(cls) -> ModuleDefinition["MenuBar"]:
-        return MenuBar.factory, [Main]
+        return MenuBar.factory, [Main, ExtensionManager]
 
     @staticmethod
     def factory(container: Container):
@@ -78,6 +82,7 @@ class MenuBar(AbstractModule, tk.Menu):
         )
         self.extension_menu.add_separator()
         self.add_cascade(label="Extensions", menu=self.extension_menu)
+        self.manage_extension_window = None
 
     def file_open(self):
         pass
@@ -122,4 +127,20 @@ class MenuBar(AbstractModule, tk.Menu):
         pass
 
     def extension_manage(self):
-        pass
+        if self.manage_extension_window is not None:
+            self.manage_extension_window.lift()
+            return
+
+        self.manage_extension_window = ManageExtension(
+            self._container,
+            self._container[Main],
+        )
+
+        def on_close():
+            if self.manage_extension_window is None:
+                return
+
+            self.manage_extension_window.destroy()
+            self.manage_extension_window = None
+
+        self.manage_extension_window.protocol("WM_DELETE_WINDOW", on_close)

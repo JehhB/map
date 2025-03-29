@@ -8,7 +8,7 @@ from reactivex.operators import throttle_first
 from reactivex.subject import BehaviorSubject
 from typing_extensions import Self, override
 
-from app.AbstractExtension import AbstractExtension
+from app.AbstractExtension import AbstractExtension, ExtensionMetadata
 from app.Container import AbstractModule, ModuleDefinition
 from app.events.AbstractEvent import AbstractEvent
 from app.ExtensionManager import ExtensionManager
@@ -63,9 +63,17 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         self.add_event_handler("init", self.on_init)
         self.add_event_handler("deinit", self.on_deinit)
 
-    def on_init(self, _: AbstractEvent):
+    def on_init(self, event: AbstractEvent):
         if self.container is None:
-            raise RuntimeError("uninitialied container")
+            event.is_success = False
+            return
+
+        try:
+            self._ros_bridge = RosBridge()
+        except RuntimeError as e:
+            event.detail = e
+            event.is_success = False
+            return
 
         self._stereo_image_disposer = self.stereo_image_observable.subscribe(
             on_next=self.process_images
@@ -76,8 +84,6 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             label=StereoVslamExtension.EXTENSION_LABEL, command=self.open_window
         )
 
-        self._ros_bridge = RosBridge()
-
     def on_deinit(self, _: AbstractEvent):
         if self._ros_bridge is not None:
             self._ros_bridge.destroy()
@@ -86,9 +92,14 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         if self._stereo_image_disposer is not None:
             self._stereo_image_disposer.dispose()
 
-        menu_index = self.menu_bar.index(StereoVslamExtension.EXTENSION_LABEL)
-        if menu_index is not None:
-            self.menu_bar.delete(menu_index)
+        menu = self.menu_bar.extension_menu
+        for i in range(menu.index("end") + 1):
+            try:
+                if menu.entrycget(i, "label") == StereoVslamExtension.EXTENSION_LABEL:
+                    menu.delete(i)
+                    break
+            except:
+                pass
 
     def open_window(self):
         if self.container is None:
@@ -118,3 +129,11 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             return
 
         self._ros_bridge.send_stereo_image(left_image, right_image)
+
+    @property
+    def metadata(self) -> ExtensionMetadata:
+        return ExtensionMetadata(
+            "Stereo VSLAM",
+            "A Stereo VSLAM extension to calibrate and map stereo vision system",
+            [],
+        )

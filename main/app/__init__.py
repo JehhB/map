@@ -2,6 +2,7 @@ from typing import Optional, final
 
 from app.AbstractExtension import AbstractExtension
 from app.Container import Container
+from app.events.InitEvent import InitEvent
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main
 from app.ui.MainGl import MainGl
@@ -20,9 +21,12 @@ class Application:
         _ = self.container.register(MainGl)
         _ = self.container.register(ExtensionManager)
 
-        def safe_enable(extension: Optional[AbstractExtension]) -> bool:
+        def safe_enable(extension: Optional[AbstractExtension]) -> InitEvent:
             if extension is None:
-                return False
+                event = InitEvent()
+                event.is_success = False
+                event.detail = RuntimeError("Extension not found")
+                return event
             return extension.enable()
 
         _ = safe_enable(self.container.register(StereoVslamExtension))
