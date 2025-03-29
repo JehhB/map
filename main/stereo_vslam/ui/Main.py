@@ -1,9 +1,7 @@
 import tkinter as tk
-from struct import pack
 from typing import TYPE_CHECKING
 
 from PIL.Image import Image
-from PIL.ImageOps import expand
 
 from stereo_vslam.ui.MenuBar import MenuBar
 

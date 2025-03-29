@@ -9,12 +9,15 @@ from app.Container import AbstractModule, ModuleDefinition
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main as AppMain
 from app.ui.MenuBar import MenuBar
+from stereo_vslam.RosBridge import RosBridge
 from stereo_vslam.ui.Main import Main
 
 
 class StereoVslamExtension(AbstractModule, AbstractExtension):
     EXTENSION_LABEL: str = "Stereo VSLAM"
+    menu_bar: "MenuBar"
     main_window: "Main | None"
+    ros_bridge: "RosBridge | None"
 
     IMAGES_TOPIC: str = "stereo-vslam.images"
 
@@ -35,18 +38,32 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         super().__init__()
 
         self.main_window = None
-        self.add_event_handler("init", self.on_init)
+        self.ros_bridge = None
 
-        pub.subscribe(self.process_images, StereoVslamExtension.IMAGES_TOPIC)
+        self.add_event_handler("init", self.on_init)
+        self.add_event_handler("deinit", self.on_deinit)
 
     def on_init(self, _: AbstractEvent):
         if self.container is None:
             raise RuntimeError("uninitialied container")
 
-        menu_bar = self.container[MenuBar]
-        menu_bar.extension_menu.add_command(
+        self.menu_bar = self.container[MenuBar]
+        self.menu_bar.extension_menu.add_command(
             label=StereoVslamExtension.EXTENSION_LABEL, command=self.open_window
         )
+        pub.subscribe(self.process_images, StereoVslamExtension.IMAGES_TOPIC)
+        self.ros_bridge = RosBridge()
+
+    def on_deinit(self, _: AbstractEvent):
+        if self.ros_bridge is not None:
+            self.ros_bridge.destroy()
+            self.ros_bridge = None
+
+        menu_index = self.menu_bar.index(StereoVslamExtension.EXTENSION_LABEL)
+        if menu_index is not None:
+            self.menu_bar.delete(menu_index)
+
+        pub.unsubscribe(self.process_images, StereoVslamExtension.IMAGES_TOPIC)
 
     def open_window(self):
         if self.container is None:
