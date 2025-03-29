@@ -2,4 +2,4 @@ from abc import ABC
 
 
 class AbstractEvent(ABC):
-    pass
+    is_success: bool = True

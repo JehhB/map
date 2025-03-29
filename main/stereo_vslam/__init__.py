@@ -1,10 +1,16 @@
+from threading import Lock
+from typing import Optional, Tuple
+
+import reactivex as rx
 from PIL.Image import Image
-from pubsub import pub
+from reactivex.abc import DisposableBase
+from reactivex.operators import throttle_first
+from reactivex.subject import BehaviorSubject
 from typing_extensions import Self, override
 
-from app.AbstractEvent import AbstractEvent
 from app.AbstractExtension import AbstractExtension
 from app.Container import AbstractModule, ModuleDefinition
+from app.events.AbstractEvent import AbstractEvent
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main as AppMain
 from app.ui.MenuBar import MenuBar
@@ -14,11 +20,18 @@ from stereo_vslam.ui.Main import Main
 
 class StereoVslamExtension(AbstractModule, AbstractExtension):
     EXTENSION_LABEL: str = "Stereo VSLAM"
-    menu_bar: "MenuBar"
-    main_window: "Main | None"
-    ros_bridge: "RosBridge | None"
+    TARGET_FPS: float = 10.0
 
-    IMAGES_TOPIC: str = "stereo-vslam.images"
+    menu_bar: MenuBar
+    main_window: Optional[Main]
+    _ros_bridge: Optional[RosBridge]
+
+    left_image_subject: rx.Subject[Optional[Image]]
+    right_image_subject: rx.Subject[Optional[Image]]
+    stereo_image_observable: rx.Observable[Tuple[Optional[Image], Optional[Image]]]
+    _stereo_image_disposer: Optional[DisposableBase]
+
+    lock: Lock
 
     @override
     @staticmethod
@@ -37,7 +50,15 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         super().__init__()
 
         self.main_window = None
-        self.ros_bridge = None
+        self._ros_bridge = None
+        self.lock = Lock()
+        self._stereo_image_disposer = None
+
+        self.left_image_subject = BehaviorSubject(None)
+        self.right_image_subject = BehaviorSubject(None)
+        self.stereo_image_observable = rx.combine_latest(
+            self.left_image_subject, self.right_image_subject
+        ).pipe(throttle_first(1 / StereoVslamExtension.TARGET_FPS))
 
         self.add_event_handler("init", self.on_init)
         self.add_event_handler("deinit", self.on_deinit)
@@ -46,23 +67,28 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         if self.container is None:
             raise RuntimeError("uninitialied container")
 
+        self._stereo_image_disposer = self.stereo_image_observable.subscribe(
+            on_next=self.process_images
+        )
+
         self.menu_bar = self.container[MenuBar]
         self.menu_bar.extension_menu.add_command(
             label=StereoVslamExtension.EXTENSION_LABEL, command=self.open_window
         )
-        pub.subscribe(self.process_images, StereoVslamExtension.IMAGES_TOPIC)
-        self.ros_bridge = RosBridge()
+
+        self._ros_bridge = RosBridge()
 
     def on_deinit(self, _: AbstractEvent):
-        if self.ros_bridge is not None:
-            self.ros_bridge.destroy()
-            self.ros_bridge = None
+        if self._ros_bridge is not None:
+            self._ros_bridge.destroy()
+            self._ros_bridge = None
+
+        if self._stereo_image_disposer is not None:
+            self._stereo_image_disposer.dispose()
 
         menu_index = self.menu_bar.index(StereoVslamExtension.EXTENSION_LABEL)
         if menu_index is not None:
             self.menu_bar.delete(menu_index)
-
-        pub.unsubscribe(self.process_images, StereoVslamExtension.IMAGES_TOPIC)
 
     def open_window(self):
         if self.container is None:
@@ -86,5 +112,9 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
         self.main_window.protocol("WM_DELETE_WINDOW", on_close)
 
-    def process_images(self, left_image: Image, right_image: Image):
-        pass
+    def process_images(self, stereo_images: Tuple[Optional[Image], Optional[Image]]):
+        left_image, right_image = stereo_images
+        if left_image is None or right_image is None or self._ros_bridge is None:
+            return
+
+        self._ros_bridge.send_stereo_image(left_image, right_image)

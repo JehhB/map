@@ -1,16 +1,25 @@
 from abc import ABC
 from typing import Callable, Dict, Set
 
-from app.AbstractEvent import AbstractEvent
+from reactivex.subject import BehaviorSubject
+
 from app.Container import SetterInjectable
+from app.events.AbstractEvent import AbstractEvent
+from app.events.DeinitEvent import DeinitEvent
+from app.events.InitEvent import InitEvent
 
 EventHandler = Callable[[AbstractEvent], None]
 
 
 class AbstractExtension(SetterInjectable, ABC):
+    active_subject: BehaviorSubject[bool]
+    _event_handlers: Dict[str, Set[EventHandler]]
+
     def __init__(self) -> None:
-        self._event_handlers: Dict[str, Set[EventHandler]] = dict()
         super().__init__()
+
+        self._event_handlers = dict()
+        self.active_subject = BehaviorSubject(False)
 
     def add_event_handler(self, event: str, event_handler: EventHandler):
         if event not in self._event_handlers:
@@ -36,3 +45,21 @@ class AbstractExtension(SetterInjectable, ABC):
 
         for handler in self._event_handlers[event]:
             handler(eventObject)
+
+    def enable(self) -> bool:
+        event = InitEvent()
+        self.emit_event("init", event)
+
+        if event.is_success:
+            self.active_subject.on_next(True)
+
+        return event.is_success
+
+    def disable(self) -> bool:
+        event = DeinitEvent()
+        self.emit_event("deinit", event)
+
+        if event.is_success:
+            self.active_subject.on_next(False)
+
+        return event.is_success

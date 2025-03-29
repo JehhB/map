@@ -2,7 +2,6 @@ from typing import Dict, Type, TypeVar
 
 from typing_extensions import Self, override
 
-from app.AbstractEvent import AbstractEvent
 from app.AbstractExtension import AbstractExtension
 from app.Container import (
     AbstractModule,
@@ -11,9 +10,14 @@ from app.Container import (
     ModuleFactory,
     SetterInjectable,
 )
+from app.events.AbstractEvent import AbstractEvent
 
 
 class InitEvent(AbstractEvent):
+    pass
+
+
+class DeinitEvent(AbstractEvent):
     pass
 
 
@@ -52,6 +56,32 @@ class ExtensionManager(AbstractModule, SetterInjectable):
         super().__init__()
         self._extensions = dict()
 
+    def enable_extension(self, key: str) -> bool:
+        if key not in self._extensions:
+            return False
+        extension = self._extensions[key]
+
+        event = InitEvent()
+        extension.emit_event("init", event)
+
+        if event.is_success:
+            extension.active_subject.on_next(True)
+
+        return event.is_success
+
+    def disable_event(self, key: str) -> bool:
+        if key not in self._extensions:
+            return False
+
+        extension = self._extensions[key]
+
+        event = DeinitEvent()
+        extension.emit_event("deinit", event)
+
+        if event.is_success:
+            extension.active_subject.on_next(False)
+
+        return event.is_success
+
     def add_extension(self, key: str, extension: AbstractExtension) -> None:
         self._extensions[key] = extension
-        extension.emit_event("init", InitEvent())
