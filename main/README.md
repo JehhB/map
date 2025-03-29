@@ -27,9 +27,5 @@ Tested on `Ubuntu 20.04 Focal Fosa` with `Python 3.8.10`
 3.  Run processes
 
     ```sh
-    roscore
-    ROS_NAMESPACE='stereo_camera' rosrun stereo_image_proc stereo_image_proc
-    roslaunch rtabmap_ros rtabmap.launch stereo:=true rviz:=false rtabmap_viz:=false
-
-    python main.py
+    roscore& roslaunch ros.launch
     ```

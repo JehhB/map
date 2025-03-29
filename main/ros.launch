@@ -1,0 +1,12 @@
+<launch>
+    <!-- Launch stereo_image_proc with a namespace -->
+    <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc" ns="stereo_camera" />
+
+    <!-- Launch RTAB-Map with parameters -->
+    <include file="$(find rtabmap_ros)/launch/rtabmap.launch">
+        <arg name="stereo" value="true" />
+        <arg name="rviz" value="false" />
+        <arg name="rtabmap_viz" value="false" />
+    </include>
+
+</launch>
