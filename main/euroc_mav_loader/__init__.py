@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 
 from cv2.typing import MatLike
 from PIL.Image import Image, fromarray
-from reactivex import Observable, Subject, operators
+from reactivex import Subject, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import override
 
@@ -49,6 +49,9 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
         self.add_event_handler("init", self.on_init)
         self.add_event_handler("deinit", self.on_deinit)
         self.main_window = None
+
+        self.player = None
+        self.relay_dispose = None
 
     def on_init(self, event: AbstractEvent):
         if self.container is None:

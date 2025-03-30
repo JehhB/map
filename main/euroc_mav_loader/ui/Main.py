@@ -1,10 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-import numpy
-from PIL import ImageTk
-from PIL.Image import Image
 from reactivex.abc import DisposableBase
 
 from app.Container import Container
