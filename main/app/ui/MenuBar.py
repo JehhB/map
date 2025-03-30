@@ -9,12 +9,31 @@ from app.ui.Main import Main
 from app.ui.ManageExtension import ManageExtension
 
 
-class MenuBar(AbstractModule, tk.Menu):
+class _RemovableItemMenu(tk.Menu):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def remove(self, label: str) -> bool:
+        length = self.index("end")
+        if length is None:
+            return False
+
+        for i in range(length + 1):
+            try:
+                if self.entrycget(i, "label") == label:
+                    self.delete(i)
+                    return True
+            except:
+                pass
+        return False
+
+
+class MenuBar(AbstractModule, _RemovableItemMenu):
     _container: Container
-    file_menu: tk.Menu
-    edit_menu: tk.Menu
-    navigate_menu: tk.Menu
-    extension_menu: tk.Menu
+    file_menu: _RemovableItemMenu
+    edit_menu: _RemovableItemMenu
+    navigate_menu: _RemovableItemMenu
+    extension_menu: _RemovableItemMenu
 
     manage_extension_window: Optional[ManageExtension]
 
@@ -44,13 +63,13 @@ class MenuBar(AbstractModule, tk.Menu):
 
         self._container = container
 
-        self.file_menu = tk.Menu(self, tearoff=0)
+        self.file_menu = _RemovableItemMenu(self, tearoff=0)
         self.file_menu.add_command(label="Open", command=self.file_open)
         self.file_menu.add_command(label="Save", command=self.file_save)
         self.file_menu.add_command(label="Export", command=self.file_export)
         self.add_cascade(label="File", menu=self.file_menu)
 
-        self.edit_menu = tk.Menu(self, tearoff=0)
+        self.edit_menu = _RemovableItemMenu(self, tearoff=0)
         self.edit_menu.add_command(label="Clear", command=self.edit_clear)
         self.edit_menu.add_command(label="Undo", command=self.edit_undo)
         self.edit_menu.add_command(label="Redo", command=self.edit_redo)
@@ -58,7 +77,7 @@ class MenuBar(AbstractModule, tk.Menu):
         self.edit_menu.add_command(label="Preferences", command=self.edit_preference)
         self.add_cascade(label="Edit", menu=self.edit_menu)
 
-        self.navigate_menu = tk.Menu(self, tearoff=0)
+        self.navigate_menu = _RemovableItemMenu(self, tearoff=0)
         self.navigate_menu.add_command(label="Zoom +", command=self.navigate_zoom_in)
         self.navigate_menu.add_command(label="Zoom -", command=self.navigate_zoom_out)
         self.navigate_menu.add_command(
@@ -73,7 +92,7 @@ class MenuBar(AbstractModule, tk.Menu):
         )
         self.add_cascade(label="Navigate", menu=self.navigate_menu)
 
-        self.extension_menu = tk.Menu(self, tearoff=0)
+        self.extension_menu = _RemovableItemMenu(self, tearoff=0)
         self.extension_menu.add_command(
             label="Add extension", command=self.extension_add
         )

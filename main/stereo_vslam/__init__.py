@@ -20,7 +20,7 @@ from stereo_vslam.ui.Main import Main
 
 class StereoVslamExtension(AbstractModule, AbstractExtension):
     EXTENSION_LABEL: str = "Stereo VSLAM"
-    TARGET_FPS: float = 10.0
+    TARGET_FPS: float = 20.0
 
     menu_bar: MenuBar
     main_window: Optional[Main]
@@ -28,7 +28,8 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
     left_image_subject: rx.Subject[Optional[Image]]
     right_image_subject: rx.Subject[Optional[Image]]
-    stereo_image_observable: rx.Observable[Tuple[Optional[Image], Optional[Image]]]
+    timestamp_subject: rx.Subject[int]
+    stereo_image_observable: rx.Observable[Tuple[Optional[Image], Optional[Image], int]]
     _stereo_image_disposer: Optional[DisposableBase]
 
     lock: Lock
@@ -42,7 +43,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
     @classmethod
     def DEFINITION(cls) -> ModuleDefinition[Self]:
         return (
-            ExtensionManager.defaultFactory("stereo-vslam", cls),
+            ExtensionManager.defaultFactory("stereo_vslam", cls),
             [ExtensionManager, MenuBar, AppMain],
         )
 
@@ -56,8 +57,10 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
         self.left_image_subject = BehaviorSubject(None)
         self.right_image_subject = BehaviorSubject(None)
+        self.timestamp_subject = rx.Subject()
+
         self.stereo_image_observable = rx.combine_latest(
-            self.left_image_subject, self.right_image_subject
+            self.left_image_subject, self.right_image_subject, self.timestamp_subject
         ).pipe(throttle_first(1 / StereoVslamExtension.TARGET_FPS))
 
         self.add_event_handler("init", self.on_init)
@@ -84,7 +87,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             label=StereoVslamExtension.EXTENSION_LABEL, command=self.open_window
         )
 
-    def on_deinit(self, _: AbstractEvent):
+    def on_deinit(self, _event: AbstractEvent):
         if self._ros_bridge is not None:
             self._ros_bridge.destroy()
             self._ros_bridge = None
@@ -92,14 +95,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         if self._stereo_image_disposer is not None:
             self._stereo_image_disposer.dispose()
 
-        menu = self.menu_bar.extension_menu
-        for i in range(menu.index("end") + 1):
-            try:
-                if menu.entrycget(i, "label") == StereoVslamExtension.EXTENSION_LABEL:
-                    menu.delete(i)
-                    break
-            except:
-                pass
+        _ = self.menu_bar.extension_menu.remove(StereoVslamExtension.EXTENSION_LABEL)
 
     def open_window(self):
         if self.container is None:
@@ -123,12 +119,14 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
         self.main_window.protocol("WM_DELETE_WINDOW", on_close)
 
-    def process_images(self, stereo_images: Tuple[Optional[Image], Optional[Image]]):
-        left_image, right_image = stereo_images
+    def process_images(
+        self, stereo_images: Tuple[Optional[Image], Optional[Image], int]
+    ):
+        left_image, right_image, timestamp = stereo_images
         if left_image is None or right_image is None or self._ros_bridge is None:
             return
 
-        self._ros_bridge.send_stereo_image(left_image, right_image)
+        self._ros_bridge.send_stereo_image(left_image, right_image, timestamp)
 
     @property
     def metadata(self) -> ExtensionMetadata:

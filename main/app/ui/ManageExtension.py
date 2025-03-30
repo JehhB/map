@@ -6,6 +6,7 @@ from app.AbstractExtension import AbstractExtension
 from app.Container import Container
 from app.ExtensionManager import ExtensionManager
 from app.ui.ScrolledFrame import ScrolledFrame
+from app.ui.WrappingLabel import WrappingLabel
 
 
 @final
@@ -70,12 +71,16 @@ class ExtensionFrame(tk.Frame):
 
         header.pack(fill=tk.X, expand=tk.YES, pady=4)
 
-        description = tk.Label(self, text=metadata.description, justify=tk.LEFT)
-        _ = description.bind(
-            "<Configure>",
-            lambda e: description.config(wraplength=description.winfo_width()),
+        if metadata.dependencies:
+            WrappingLabel(
+                self,
+                text="Dependencies: " + ", ".join(metadata.dependencies),
+                justify=tk.LEFT,
+            ).pack(side=tk.TOP, fill=tk.X, expand=tk.YES, pady=4)
+
+        WrappingLabel(self, text=metadata.description, justify=tk.LEFT).pack(
+            side=tk.TOP, fill=tk.X, expand=tk.YES, pady=4
         )
-        description.pack(fill=tk.X, expand=tk.YES, pady=4)
 
         _ = self._extension.active_subject.subscribe(on_next=self._render_button)
 

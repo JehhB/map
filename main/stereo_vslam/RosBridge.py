@@ -1,5 +1,6 @@
 import numpy as np
 import rosgraph
+import rospy
 from cv_bridge import CvBridge
 from PIL.Image import Image
 from rospy import Publisher, Time
@@ -19,6 +20,7 @@ class RosBridge:
         if not rosgraph.is_master_online():
             raise RuntimeError("roscore is not running")
 
+        rospy.init_node("main_map")
         self.bridge = CvBridge()
 
         self.left_image_pub = Publisher(
@@ -36,7 +38,7 @@ class RosBridge:
 
     def _image_to_imgmsg(self, img: Image) -> ImageRos:
         img_np = np.array(img)
-        return self.bridge.cv2_to_imgmsg(img_np, encoding="rgb8")
+        return self.bridge.cv2_to_imgmsg(img_np)
 
     def send_stereo_camera_info(
         self, left_camera_info: CameraInfo, right_camera_info: CameraInfo
@@ -44,8 +46,8 @@ class RosBridge:
         self.left_camera_info_pub.publish(left_camera_info)
         self.right_camera_info_pub.publish(right_camera_info)
 
-    def send_stereo_image(self, left_image: Image, right_image: Image):
-        current_time = Time.now()
+    def send_stereo_image(self, left_image: Image, right_image: Image, timestamp: int):
+        current_time = Time.from_sec(timestamp / 1e9)
 
         left_image_msg = self._image_to_imgmsg(left_image)
         right_image_msg = self._image_to_imgmsg(right_image)
@@ -57,6 +59,7 @@ class RosBridge:
         self.right_image_pub.publish(right_image_msg)
 
     def destroy(self):
+        rospy.signal_shutdown("Don't need anymore")
         self.left_image_pub.unregister()
         self.right_image_pub.unregister()
         self.left_camera_info_pub.unregister()

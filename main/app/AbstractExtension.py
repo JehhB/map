@@ -74,7 +74,7 @@ class AbstractExtension(SetterInjectable, ABC):
 
     @property
     def is_active(self):
-        self.active_subject.value
+        return self.active_subject.value
 
     @property
     @abstractmethod

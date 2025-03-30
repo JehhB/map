@@ -7,6 +7,7 @@ from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main
 from app.ui.MainGl import MainGl
 from app.ui.MenuBar import MenuBar
+from euroc_mav_loader import EuRoCMAVLoaderExtension
 from stereo_vslam import StereoVslamExtension
 
 
@@ -30,6 +31,7 @@ class Application:
             return extension.enable()
 
         _ = safe_enable(self.container.register(StereoVslamExtension))
+        _ = safe_enable(self.container.register(EuRoCMAVLoaderExtension))
 
     def mainloop(self):
         main = self.container[Main]
