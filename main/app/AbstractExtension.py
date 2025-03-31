@@ -1,15 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Set
+from typing import List
 
 from reactivex.subject import BehaviorSubject
 
 from app.Container import SetterInjectable
-from app.events.AbstractEvent import AbstractEvent
+from app.EventEmiter import EventEmitter
 from app.events.DeinitEvent import DeinitEvent
 from app.events.InitEvent import InitEvent
-
-EventHandler = Callable[[AbstractEvent], None]
 
 
 @dataclass
@@ -19,40 +17,12 @@ class ExtensionMetadata:
     dependencies: List[str]
 
 
-class AbstractExtension(SetterInjectable, ABC):
+class AbstractExtension(EventEmitter, SetterInjectable, ABC):
     active_subject: BehaviorSubject[bool]
-    _event_handlers: Dict[str, Set[EventHandler]]
 
     def __init__(self) -> None:
         super().__init__()
-
-        self._event_handlers = dict()
         self.active_subject = BehaviorSubject(False)
-
-    def add_event_handler(self, event: str, event_handler: EventHandler):
-        if event not in self._event_handlers:
-            self._event_handlers[event] = set()
-        self._event_handlers[event].add(event_handler)
-
-    def remove_event_handler(self, event: str, event_handler: EventHandler) -> bool:
-        if (
-            event not in self._event_handlers
-            or event_handler not in self._event_handlers[event]
-        ):
-            return False
-        self._event_handlers[event].remove(event_handler)
-
-        if len(self._event_handlers) == 0:
-            del self._event_handlers[event]
-
-        return True
-
-    def emit_event(self, event: str, eventObject: AbstractEvent):
-        if event not in self._event_handlers:
-            return
-
-        for handler in self._event_handlers[event]:
-            handler(eventObject)
 
     def enable(self) -> InitEvent:
         event = InitEvent()

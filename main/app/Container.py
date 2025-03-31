@@ -14,10 +14,7 @@ SetterInjectableImpl = TypeVar("SetterInjectableImpl", bound="SetterInjectable")
 
 
 class SetterInjectable:
-    container: Union[None, "Container"]
-
-    def __init__(self) -> None:
-        self.container = None
+    container: Union[None, "Container"] = None
 
     def set_container(self, container: "Container"):
         self.container = container

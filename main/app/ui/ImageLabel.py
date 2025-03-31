@@ -1,9 +1,12 @@
 import tkinter as tk
-from typing import Optional
+from typing import Optional, Union
 
 import cv2
 from cv2.typing import MatLike
 from PIL import Image, ImageTk
+from reactivex import Observable
+from reactivex.abc import DisposableBase
+from typing_extensions import override
 
 
 class ImageLabel(tk.Label):
@@ -20,8 +23,18 @@ class ImageLabel(tk.Label):
     height: int
     photo: Optional[ImageTk.PhotoImage]
 
+    _image_observable: Optional[Observable[Union[Image.Image, MatLike, str, None]]]
+    _disposer: Optional[DisposableBase]
+
     def __init__(
-        self, master: Optional[tk.Misc] = None, width=100, height=100, **kwargs
+        self,
+        master: Optional[tk.Misc] = None,
+        width: int = 100,
+        height: int = 100,
+        image_observable: Optional[
+            Observable[Union[Image.Image, MatLike, str, None]]
+        ] = None,
+        **kwargs,
     ):
         """
         Initialize the ImageLabel with specified dimensions.
@@ -37,8 +50,35 @@ class ImageLabel(tk.Label):
         self.height = height
         self.photo = None
 
+        self._disposer = None
+
         # Set initial blank image
         self._set_blank_image()
+        self.image_observable = image_observable
+
+    @property
+    def image_observable(self):
+        return self._image_observable
+
+    @image_observable.setter
+    def image_observable(
+        self,
+        image_observable: Optional[
+            Observable[Union[Image.Image, MatLike, str, None]]
+        ] = None,
+    ):
+        if self._disposer is not None:
+            self._disposer.dispose()
+
+        self._image_observable = image_observable
+        if image_observable:
+            self._disposer = image_observable.subscribe(on_next=self.update_image)
+
+    @image_observable.deleter
+    def image_observable(self):
+        if self._disposer is not None:
+            self._disposer.dispose()
+        self._image_observable = None
 
     def _set_blank_image(self):
         blank = Image.new("RGB", (self.width, self.height), color="black")
@@ -48,7 +88,17 @@ class ImageLabel(tk.Label):
     def _resize_image(self, img: Image.Image):
         return img.resize((self.width, self.height))
 
-    def update_from_cv2(self, cv_img: MatLike):
+    def update_image(self, image: Union[Image.Image, MatLike, str, None]):
+        if image is None:
+            self._set_blank_image()
+        elif isinstance(image, Image.Image):
+            self.update_from_pil(image)
+        elif isinstance(image, str):
+            self.update_from_file(image)
+        else:
+            self.update_from_cv2(image)
+
+    def update_from_cv2(self, cv_img: Optional[MatLike]):
         """
         Update the label with an OpenCV image (numpy array).
 
@@ -107,3 +157,10 @@ class ImageLabel(tk.Label):
     def clear(self):
         """Reset the label to display a blank image."""
         self._set_blank_image()
+
+    @override
+    def destroy(self) -> None:
+        if self._disposer is not None:
+            self._disposer.dispose()
+        self.image_observable = None
+        return super().destroy()

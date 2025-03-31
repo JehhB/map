@@ -30,12 +30,12 @@ PyOpenGL==3.1.9
 PyOpenGL-accelerate==3.1.9
 pyopengltk==0.0.4
 pyparsing==3.1.4
-Pypubsub==4.0.3
 python-dateutil==2.9.0.post0
 python-qt-binding==0.4.4
 PyYAML==6.0.2
 qt-gui==0.4.2
 qt-gui-cpp==0.4.2
+reactivex==4.0.4
 resource-retriever==1.12.8
 rosbag==1.17.0
 rosboost-cfg==1.15.8

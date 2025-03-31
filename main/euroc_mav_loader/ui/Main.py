@@ -2,7 +2,9 @@ import tkinter as tk
 from tkinter import filedialog
 from typing import TYPE_CHECKING
 
+import reactivex.operators as ops
 from reactivex.abc import DisposableBase
+from typing_extensions import override
 
 from app.Container import Container
 from app.ui.ImageLabel import ImageLabel
@@ -26,9 +28,6 @@ class Main(tk.Toplevel):
     right_image: ImageLabel
 
     fps_callback: str
-
-    left_disposer: DisposableBase
-    right_disposer: DisposableBase
 
     def __init__(
         self,
@@ -94,7 +93,7 @@ class Main(tk.Toplevel):
 
         tk.Label(control_frame, text="Speed").pack(side=tk.LEFT)
         tk.Scale(
-            control_frame, from_=5, to=40, variable=self.fps, orient=tk.HORIZONTAL
+            control_frame, from_=5, to=60, variable=self.fps, orient=tk.HORIZONTAL
         ).pack(side=tk.LEFT, expand=tk.YES, fill=tk.X, padx=4)
 
         self.fps_callback = self.fps.trace_add("write", self.set_fps)
@@ -103,7 +102,9 @@ class Main(tk.Toplevel):
             side=tk.LEFT, padx=4
         )
 
-        tk.Button(control_frame, text="Start Callibration").pack(side=tk.LEFT, padx=4)
+        tk.Button(
+            control_frame, text="Start Callibration", command=self.start_calibration
+        ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(control_frame, text="Pause", state="disabled").pack(
             side=tk.LEFT, padx=4
@@ -120,12 +121,30 @@ class Main(tk.Toplevel):
 
         control_frame.pack(padx=8, pady=8, expand=tk.YES, fill=tk.X)
 
-        self.left_disposer = self._stereo_extension.left_image_subject.subscribe(
-            on_next=self.left_image.update_from_pil
+        self.left_image.image_observable = (
+            self._stereo_extension.calibrator.is_calibrating.pipe(
+                ops.map(
+                    lambda is_calibrating: (
+                        self._stereo_extension.calibrator.left_image_with_drawing
+                        if is_calibrating
+                        else self._stereo_extension.left_image_subject
+                    )
+                ),
+                ops.switch_latest(),
+            )
         )
 
-        self.right_disposer = self._stereo_extension.right_image_subject.subscribe(
-            on_next=self.right_image.update_from_pil
+        self.right_image.image_observable = (
+            self._stereo_extension.calibrator.is_calibrating.pipe(
+                ops.map(
+                    lambda is_calibrating: (
+                        self._stereo_extension.calibrator.right_image_with_drawing
+                        if is_calibrating
+                        else self._stereo_extension.right_image_subject
+                    )
+                ),
+                ops.switch_latest(),
+            )
         )
 
     def _choose_path(self):
@@ -138,9 +157,15 @@ class Main(tk.Toplevel):
         if isinstance(dir, str):
             self.folder_path.set(dir)
 
-    def dispose(self):
-        self.left_disposer.dispose()
-        self.right_disposer.dispose()
+    def start_calibration(self):
+        self._stereo_extension.calibrator_params.on_next(
+            {
+                "chessboard_size": (6, 7),
+                "square_size": 60.0,
+            }
+        )
+        self._stereo_extension.start_calibration()
+        self.start()
 
     def start(self):
         if self._extension.player is None:

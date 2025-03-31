@@ -14,6 +14,7 @@ from app.events.AbstractEvent import AbstractEvent
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main as AppMain
 from app.ui.MenuBar import MenuBar
+from stereo_vslam.Calibrator import Calibrator, CalibratorParams
 from stereo_vslam.RosBridge import RosBridge
 from stereo_vslam.ui.Main import Main
 
@@ -30,9 +31,22 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
     right_image_subject: rx.Subject[Optional[Image]]
     timestamp_subject: rx.Subject[int]
     stereo_image_observable: rx.Observable[Tuple[Optional[Image], Optional[Image], int]]
+
     _stereo_image_disposer: Optional[DisposableBase]
+    _calibrator_disposer: Optional[DisposableBase]
+
+    calibrator: Calibrator
+    calibrator_params: BehaviorSubject[CalibratorParams]
 
     lock: Lock
+
+    @property
+    def metadata(self) -> ExtensionMetadata:
+        return ExtensionMetadata(
+            "Stereo VSLAM",
+            "A Stereo VSLAM extension to calibrate and map stereo vision system",
+            [],
+        )
 
     @override
     @staticmethod
@@ -66,6 +80,17 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         self.add_event_handler("init", self.on_init)
         self.add_event_handler("deinit", self.on_deinit)
 
+        self.calibrator = Calibrator()
+        self.calibrator_params = BehaviorSubject(
+            {
+                "chessboard_size": (6, 7),
+                "square_size": 30,
+            }
+        )
+
+        self._stereo_image_disposer = None
+        self._calibrator_disposer = None
+
     def on_init(self, event: AbstractEvent):
         if self.container is None:
             event.is_success = False
@@ -82,6 +107,10 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             on_next=self.process_images
         )
 
+        self._calibrator_disposer = self.stereo_image_observable.pipe(
+            throttle_first(1)
+        ).subscribe(on_next=self.calibrator.next)
+
         self.menu_bar = self.container[MenuBar]
         self.menu_bar.extension_menu.add_command(
             label=StereoVslamExtension.EXTENSION_LABEL, command=self.open_window
@@ -94,6 +123,9 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
         if self._stereo_image_disposer is not None:
             self._stereo_image_disposer.dispose()
+
+        if self._calibrator_disposer is not None:
+            self._calibrator_disposer.dispose()
 
         _ = self.menu_bar.extension_menu.remove(StereoVslamExtension.EXTENSION_LABEL)
 
@@ -128,10 +160,5 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
         self._ros_bridge.send_stereo_image(left_image, right_image, timestamp)
 
-    @property
-    def metadata(self) -> ExtensionMetadata:
-        return ExtensionMetadata(
-            "Stereo VSLAM",
-            "A Stereo VSLAM extension to calibrate and map stereo vision system",
-            [],
-        )
+    def start_calibration(self):
+        self.calibrator.start(self.calibrator_params.value)
