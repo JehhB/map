@@ -71,7 +71,6 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
         )
 
     def on_deinit(self, _event: AbstractEvent):
-        _ = self.menu_bar.extension_menu.remove(EuRoCMAVLoaderExtension.EXTENSION_LABEL)
 
         if self.player is not None:
             self.player.dispose()
@@ -82,6 +81,13 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
             self.relay_dispose = None
 
         self.dataset_loader = None
+
+        try:
+            _ = self.menu_bar.extension_menu.remove(
+                EuRoCMAVLoaderExtension.EXTENSION_LABEL
+            )
+        except:
+            pass
 
     def load_dataset(self, path: str):
         self.dataset_loader = DatasetLoader(path)

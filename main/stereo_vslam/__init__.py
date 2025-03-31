@@ -108,7 +108,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         )
 
         self._calibrator_disposer = self.stereo_image_observable.pipe(
-            throttle_first(1)
+            throttle_first(0.8)
         ).subscribe(on_next=self.calibrator.next)
 
         self.menu_bar = self.container[MenuBar]
@@ -127,7 +127,12 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         if self._calibrator_disposer is not None:
             self._calibrator_disposer.dispose()
 
-        _ = self.menu_bar.extension_menu.remove(StereoVslamExtension.EXTENSION_LABEL)
+        try:
+            _ = self.menu_bar.extension_menu.remove(
+                StereoVslamExtension.EXTENSION_LABEL
+            )
+        except:
+            pass
 
     def open_window(self):
         if self.container is None:

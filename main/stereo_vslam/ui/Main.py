@@ -1,3 +1,4 @@
+import threading
 import tkinter as tk
 from typing import TYPE_CHECKING, Optional, Set, Tuple
 
@@ -280,9 +281,14 @@ class Main(tk.Toplevel):
 
     def end_calibration(self):
         self.extension.calibrator.stop()
+        thread = threading.Thread(
+            target=self.extension.calibrator.update_calibration, daemon=True
+        )
+        thread.start()
 
     @override
     def destroy(self) -> None:
         for disposer in self.disposers:
             disposer.dispose()
+        self.disposers = set()
         return super().destroy()

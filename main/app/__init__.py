@@ -36,6 +36,7 @@ class Application:
     def mainloop(self):
         main = self.container[Main]
         main.mainloop()
+        self.container[ExtensionManager].dispose()
 
 
 application = Application()

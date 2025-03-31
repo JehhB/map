@@ -54,3 +54,7 @@ class ExtensionManager(AbstractModule, SetterInjectable):
 
     def values(self):
         return self._extensions.values()
+
+    def dispose(self):
+        for _k, x in self._extensions.items():
+            _ = x.disable()

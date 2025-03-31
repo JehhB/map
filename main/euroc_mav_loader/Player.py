@@ -1,30 +1,34 @@
-import concurrent.futures
+from __future__ import annotations
+
 import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from typing import Generic, Iterator, Literal, Optional, TypeVar
 
 from reactivex.scheduler import ThreadPoolScheduler
 from reactivex.subject import BehaviorSubject, Subject
 from typing_extensions import TypeAlias
 
+from app.EventEmiter import EventEmitter
+
 T = TypeVar("T")
 
 PlayerState: TypeAlias = Literal["playing", "idle", "paused", "completed"]
 
 
-class Player(Generic[T]):
+class Player(EventEmitter, Generic[T]):
     data_iterator: Iterator[T]
     _frame_rate: float
     _frame_interval: float
     subject: Subject[T]
     state_subject: Subject[PlayerState]
-    executor: concurrent.futures.ThreadPoolExecutor
+    executor: ThreadPoolExecutor
     scheduler: ThreadPoolScheduler
 
     _running: bool
     _paused: bool
     _stop_requested: bool
-    _playback_thread: Optional[concurrent.futures.Future]
+    _playback_thread: Optional[Future[None]]
     _lock: threading.Lock
     _frame_rate_changed: threading.Event
 
@@ -65,7 +69,7 @@ class Player(Generic[T]):
         )
 
         # Thread pool for background processing
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.executor = ThreadPoolExecutor(max_workers=1)
         self.scheduler = ThreadPoolScheduler(max_workers=1)
 
         # Control flags
@@ -157,7 +161,7 @@ class Player(Generic[T]):
             if self._playback_thread is not None:
                 try:
                     self._playback_thread.result(timeout=1.0)
-                except concurrent.futures.TimeoutError:
+                except TimeoutError:
                     # Thread didn't complete in time
                     pass
 
@@ -194,7 +198,7 @@ class Player(Generic[T]):
         Args:
             data_iterator: New iterator to use (optional)
         """
-        self.stop()
+        _ = self.stop()
 
         with self._lock:
             if data_iterator is not None:

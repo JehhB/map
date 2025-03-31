@@ -8,6 +8,8 @@ from reactivex import Observable
 from reactivex.abc import DisposableBase
 from typing_extensions import override
 
+from app.ui.utils import safe_callback
+
 
 class ImageLabel(tk.Label):
     """
@@ -72,7 +74,9 @@ class ImageLabel(tk.Label):
 
         self._image_observable = image_observable
         if image_observable:
-            self._disposer = image_observable.subscribe(on_next=self.update_image)
+            self._disposer = image_observable.subscribe(
+                on_next=safe_callback(self.master, self.update_image)
+            )
 
     @image_observable.deleter
     def image_observable(self):

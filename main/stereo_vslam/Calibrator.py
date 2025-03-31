@@ -206,6 +206,7 @@ class Calibrator:
             np.zeros((3, 3)),
             np.zeros((1, 5)),
         )
+        print("calibrated left camera")
 
         ret_right, KR, DR, _rvecs_right, _tvecs_right = cv2.calibrateCamera(
             self.objpoints,
@@ -214,6 +215,7 @@ class Calibrator:
             np.zeros((3, 3)),
             np.zeros((1, 5)),
         )
+        print("calibrated right camera")
 
         ret, K1, D1, K2, D2, R, T, E, F = cv2.stereoCalibrate(
             self.objpoints,
@@ -231,6 +233,7 @@ class Calibrator:
                 1e-5,
             ),
         )
+        print("calibrated stereo camera")
 
         R1, R2, P1, P2, Q, _roi_left, _roi_right = cv2.stereoRectify(
             K1,
@@ -243,6 +246,7 @@ class Calibrator:
             flags=cv2.CALIB_ZERO_DISPARITY,
             alpha=0,
         )
+        print("calibrated stereo rectification")
 
         ret = (
             self._get_camera_info(D1, K1, R1, P1, ret_left),
@@ -255,6 +259,8 @@ class Calibrator:
             ),
         )
         self.stereo_camera_info.on_next(ret)
+        print("calibrated done")
+
         return ret
 
     def _get_camera_info(
