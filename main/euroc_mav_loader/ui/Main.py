@@ -166,11 +166,12 @@ class Main(tk.Toplevel):
     def start_calibration(self):
         self._stereo_extension.calibrator_params.on_next(
             {
-                "chessboard_size": (6, 7),
+                "chessboard_size": (7, 6),
                 "square_size": 60.0,
             }
         )
         self._stereo_extension.start_calibration()
+
         if self._extension.player is None:
             return
         _ = self._extension.player.start()

@@ -1,5 +1,6 @@
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
+from tkinter import messagebox
 from typing import TYPE_CHECKING, Optional, Set, Tuple
 
 from PIL.Image import Image
@@ -78,7 +79,9 @@ class Main(tk.Toplevel):
         )
         self.right_image.pack(pady=4, expand=tk.FALSE)
 
-        viewer_frame.grid(row=0, column=0, pady=4, ipady=4, padx=8, ipadx=8)
+        viewer_frame.grid(
+            row=0, column=0, pady=4, ipady=4, padx=8, ipadx=8, sticky="ew"
+        )
 
         calibration_frame = tk.LabelFrame(self, text="Calibration")
 
@@ -173,24 +176,34 @@ class Main(tk.Toplevel):
         ).grid(row=2, column=1, pady=4, padx=4, columnspan=2, sticky="ew")
 
         start_calibraton_button = tk.Button(
-            calibration_frame, text="Start calibration", command=self.start_calibration
+            calibration_frame, text="Start", command=self.start_calibration
         )
 
-        end_calibraton_button = tk.Button(
-            calibration_frame, text="Stop calibration", command=self.end_calibration
+        pause_calibration_button = tk.Button(
+            calibration_frame, text="Pause", command=self.pause_calibration
         )
+
+        reset_calibration_button = tk.Button(
+            calibration_frame, text="Reset", command=self.reset_calibration
+        )
+        reset_calibration_button.grid(row=3, column=1, pady=4, padx=4, sticky="ew")
+
+        update_calibration_button = tk.Button(
+            calibration_frame, text="Update", command=self.update_calibration
+        )
+        update_calibration_button.grid(row=3, column=2, pady=4, padx=4, sticky="ew")
 
         def layout_calibration_button(is_calibrating: bool):
             if is_calibrating:
-                end_calibraton_button.grid(
-                    row=3, column=0, pady=4, padx=4, columnspan=3, sticky="ew"
+                pause_calibration_button.grid(
+                    row=3, column=0, pady=4, padx=4, sticky="ew"
                 )
                 start_calibraton_button.grid_forget()
             else:
                 start_calibraton_button.grid(
-                    row=3, column=0, pady=4, padx=4, columnspan=3, sticky="ew"
+                    row=3, column=0, pady=4, padx=4, sticky="ew"
                 )
-                end_calibraton_button.grid_forget()
+                pause_calibration_button.grid_forget()
 
         self.disposers.add(
             self.extension.calibrator.is_calibrating.subscribe(
@@ -200,9 +213,9 @@ class Main(tk.Toplevel):
 
         def calibration_count_subscriber(x: int):
             if x < self.extension.calibrator.MINIMUM_NUMBER_SAMPLE:
-                _ = end_calibraton_button.config(state="disabled")
+                _ = update_calibration_button.config(state="disabled")
             else:
-                _ = end_calibraton_button.config(state="normal")
+                _ = update_calibration_button.config(state="normal")
             sample_count_var.set(x)
 
         self.disposers.add(
@@ -282,11 +295,26 @@ class Main(tk.Toplevel):
     def start_calibration(self):
         self.extension.start_calibration()
 
-    def end_calibration(self):
-        self.extension.calibrator.stop()
-        _ = self.calibration_executor.submit(
-            self.extension.calibrator.update_calibration
+    def pause_calibration(self):
+        self.extension.calibrator.pause()
+
+    def reset_calibration(self):
+        response = messagebox.askyesno(
+            "Reset calibration", "Are you sure you want to reset calibration data?"
         )
+        if response:
+            self.extension.calibrator.reset()
+
+    def update_calibration(self):
+        response = messagebox.askyesno(
+            "Update calibration",
+            "This would overwrite previous calibration information. Are you sure you want to proceed?",
+        )
+
+        if response:
+            future = self.calibration_executor.submit(
+                self.extension.calibrator.update_calibration
+            )
 
     @override
     def destroy(self) -> None:

@@ -1,3 +1,4 @@
+import os
 from typing import Optional, Set, Tuple
 
 from cv2.typing import MatLike
@@ -18,9 +19,12 @@ from euroc_mav_loader.Player import Player, PlayerState
 from euroc_mav_loader.ui.Main import Main
 from stereo_vslam import StereoVslamExtension
 
+EXTENSION_FOLDER = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_CAMERA_INFO = os.path.join(EXTENSION_FOLDER, "cam_info_euroc.yaml")
+
 
 class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
-    EXTENSION_LABEL = "EuRoC MAV Loader"
+    EXTENSION_LABEL: str = "EuRoC MAV Loader"
 
     menu_bar: MenuBar
     stereo_vslam: StereoVslamExtension
@@ -64,6 +68,10 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
         if not self.stereo_vslam.is_active:
             event.is_success = False
             event.detail = RuntimeError("Stereo VSLAM Extension is not active")
+            return
+        if not self.stereo_vslam.calibrator.load(DEFAULT_CAMERA_INFO):
+            event.is_success = False
+            event.detail = RuntimeError("Failed to load default camera info")
             return
 
         self.menu_bar = self.container[MenuBar]

@@ -1,11 +1,15 @@
+import os
 from dataclasses import dataclass
+from fileinput import filename
 from typing import List, Optional, Tuple, TypedDict
 
 import cv2
 import numpy as np
+import yaml
 from cv2.typing import MatLike
 from PIL import Image
 from reactivex.subject import BehaviorSubject, Subject
+from typing_extensions import TypeAlias
 
 
 @dataclass
@@ -23,7 +27,7 @@ class CameraInfo:
 
 
 @dataclass
-class StereoCameraInfo:
+class StereoInfo:
     disparity_to_depth_matrix: MatLike
     essential_matrix: MatLike
     fundamental_matrix: MatLike
@@ -33,6 +37,9 @@ class StereoCameraInfo:
 class CalibratorParams(TypedDict):
     chessboard_size: Tuple[int, int]
     square_size: float
+
+
+StereoCameraInfo: TypeAlias = Tuple[CameraInfo, CameraInfo, StereoInfo]
 
 
 class Calibrator:
@@ -49,9 +56,7 @@ class Calibrator:
     number_of_samples: BehaviorSubject[int]
     left_image_with_drawing: Subject[Image.Image]
     right_image_with_drawing: Subject[Image.Image]
-    stereo_camera_info: Subject[
-        Optional[Tuple[CameraInfo, CameraInfo, StereoCameraInfo]]
-    ]
+    stereo_camera_info: BehaviorSubject[Optional[StereoCameraInfo]]
 
     img_shape: Optional[Tuple[int, ...]]
 
@@ -88,9 +93,6 @@ class Calibrator:
         self.objp: MatLike
 
     def start(self, params: CalibratorParams):
-        self.is_calibrating.on_next(True)
-        self.stereo_camera_info.on_next(None)
-
         self.chessboard_size = params["chessboard_size"]
         self.square_size = params["square_size"]
         self.objp = np.zeros(
@@ -101,7 +103,12 @@ class Calibrator:
         ].T.reshape(-1, 2)
         self.objp *= self.square_size
 
-    def next(self, images: Tuple[Optional[Image.Image], Optional[Image.Image], int]):
+        self.is_calibrating.on_next(True)
+        self.stereo_camera_info.on_next(None)
+
+    def next(
+        self, images: Tuple[Optional[Image.Image], Optional[Image.Image], int, bool]
+    ):
         """
         Process a new pair of stereo images for calibration.
 
@@ -112,7 +119,7 @@ class Calibrator:
         Returns:
             bool: True if corners found in both images, False otherwise
         """
-        left_image, right_image, _timestamp = images
+        left_image, right_image, _timestamp, _is_calibrating = images
 
         if not self.is_calibrating.value:
             return
@@ -203,17 +210,13 @@ class Calibrator:
             self.objpoints,
             self.imgpoints_left,
             self.img_shape,
-            np.zeros((3, 3)),
-            np.zeros((1, 5)),
+            None,
+            None,
         )
         print("calibrated left camera")
 
         ret_right, KR, DR, _rvecs_right, _tvecs_right = cv2.calibrateCamera(
-            self.objpoints,
-            self.imgpoints_right,
-            self.img_shape,
-            np.zeros((3, 3)),
-            np.zeros((1, 5)),
+            self.objpoints, self.imgpoints_right, self.img_shape, None, None
         )
         print("calibrated right camera")
 
@@ -251,7 +254,7 @@ class Calibrator:
         ret = (
             self._get_camera_info(D1, K1, R1, P1, ret_left),
             self._get_camera_info(D2, K2, R2, P2, ret_right),
-            StereoCameraInfo(
+            StereoInfo(
                 disparity_to_depth_matrix=Q,
                 essential_matrix=E,
                 fundamental_matrix=F,
@@ -291,6 +294,9 @@ class Calibrator:
             error=error,
         )
 
+    def resume(self):
+        self.is_calibrating.on_next(True)
+
     def reset(self):
         """Reset the calibrator to start fresh."""
         self.objpoints = []
@@ -301,8 +307,111 @@ class Calibrator:
         self.is_calibrating.on_next(False)
         self.stereo_camera_info.on_next(None)
 
-    def resume(self):
-        self.is_calibrating.on_next(True)
-
-    def stop(self):
+    def pause(self):
         self.is_calibrating.on_next(False)
+
+    def save(self, file_name: str) -> bool:
+        yaml_dump = self.get_calibration_info()
+
+        if yaml_dump is None:
+            return False
+
+        try:
+            with open(file_name, "w") as f:
+                _ = f.write(yaml_dump)
+
+            return True
+        except Exception as e:
+            print(e.__repr__())
+            return False
+
+    def get_calibration_info(self) -> Optional[str]:
+        if self.stereo_camera_info.value is None:
+            return None
+
+        left_camera_info, right_camera_info, stereo_info = self.stereo_camera_info.value
+
+        # Convert numpy matrices to lists for YAML serialization
+        serializable_stereo_info = {
+            "disparity_to_depth_matrix": (
+                stereo_info.disparity_to_depth_matrix.tolist()
+            ),
+            "essential_matrix": (stereo_info.essential_matrix.tolist()),
+            "fundamental_matrix": (stereo_info.fundamental_matrix.tolist()),
+            "error": stereo_info.error,
+        }
+
+        # Create dictionary for YAML serialization
+        camera_data = {
+            "left_camera_info": {
+                "height": left_camera_info.height,
+                "width": left_camera_info.width,
+                "distortion_parameters": left_camera_info.distortion_parameters,
+                "intrinsic_matrix": left_camera_info.intrinsic_matrix,
+                "rectification_matrix": left_camera_info.rectification_matrix,
+                "projection_matrix": left_camera_info.projection_matrix,
+                "error": left_camera_info.error,
+                "distortion_model": left_camera_info.distortion_model,
+            },
+            "right_camera_info": {
+                "height": right_camera_info.height,
+                "width": right_camera_info.width,
+                "distortion_parameters": right_camera_info.distortion_parameters,
+                "intrinsic_matrix": right_camera_info.intrinsic_matrix,
+                "rectification_matrix": right_camera_info.rectification_matrix,
+                "projection_matrix": right_camera_info.projection_matrix,
+                "error": right_camera_info.error,
+                "distortion_model": right_camera_info.distortion_model,
+            },
+            "stereo_info": serializable_stereo_info,
+        }
+
+        return yaml.dump(camera_data, default_flow_style=True)
+
+    def load(self, file_name: str) -> bool:
+        try:
+            # Read YAML file
+            with open(file_name, "r") as f:
+                camera_data = yaml.safe_load(f)
+
+            left_data = camera_data["left_camera_info"]
+            left_camera_info = CameraInfo(
+                height=left_data["height"],
+                width=left_data["width"],
+                distortion_parameters=left_data["distortion_parameters"],
+                intrinsic_matrix=left_data["intrinsic_matrix"],
+                rectification_matrix=left_data["rectification_matrix"],
+                projection_matrix=left_data["projection_matrix"],
+                error=left_data["error"],
+                distortion_model=left_data.get("distortion_model", "plumb_bob"),
+            )
+
+            right_data = camera_data["right_camera_info"]
+            right_camera_info = CameraInfo(
+                height=right_data["height"],
+                width=right_data["width"],
+                distortion_parameters=right_data["distortion_parameters"],
+                intrinsic_matrix=right_data["intrinsic_matrix"],
+                rectification_matrix=right_data["rectification_matrix"],
+                projection_matrix=right_data["projection_matrix"],
+                error=right_data["error"],
+                distortion_model=right_data.get("distortion_model", "plumb_bob"),
+            )
+
+            stereo_data = camera_data["stereo_info"]
+            stereo_info = StereoInfo(
+                disparity_to_depth_matrix=np.array(
+                    stereo_data["disparity_to_depth_matrix"]
+                ),
+                essential_matrix=np.array(stereo_data["essential_matrix"]),
+                fundamental_matrix=np.array(stereo_data["fundamental_matrix"]),
+                error=stereo_data["error"],
+            )
+
+            # Update the stereo camera info
+            self.stereo_camera_info.on_next(
+                (left_camera_info, right_camera_info, stereo_info)
+            )
+            return True
+        except:
+            return False

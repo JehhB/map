@@ -6,6 +6,7 @@ from PIL.Image import Image
 from reactivex.abc import DisposableBase
 from reactivex.operators import throttle_first
 from reactivex.subject import BehaviorSubject
+from sensor_msgs.msg import CameraInfo
 from typing_extensions import Self, override
 
 from app.AbstractExtension import AbstractExtension, ExtensionMetadata
@@ -14,7 +15,12 @@ from app.events.AbstractEvent import AbstractEvent
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main as AppMain
 from app.ui.MenuBar import MenuBar
-from stereo_vslam.Calibrator import Calibrator, CalibratorParams
+from stereo_vslam.Calibrator import (
+    Calibrator,
+    CalibratorParams,
+    StereoCameraInfo,
+    StereoInfo,
+)
 from stereo_vslam.RosBridge import RosBridge
 from stereo_vslam.ui.Main import Main
 
@@ -30,7 +36,9 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
     left_image_subject: rx.Subject[Optional[Image]]
     right_image_subject: rx.Subject[Optional[Image]]
     timestamp_subject: rx.Subject[int]
-    stereo_image_observable: rx.Observable[Tuple[Optional[Image], Optional[Image], int]]
+    stereo_image_observable: rx.Observable[
+        Tuple[Optional[Image], Optional[Image], int, bool]
+    ]
 
     _stereo_image_disposer: Optional[DisposableBase]
     _calibrator_disposer: Optional[DisposableBase]
@@ -73,13 +81,6 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         self.right_image_subject = BehaviorSubject(None)
         self.timestamp_subject = rx.Subject()
 
-        self.stereo_image_observable = rx.combine_latest(
-            self.left_image_subject, self.right_image_subject, self.timestamp_subject
-        ).pipe(throttle_first(1 / StereoVslamExtension.TARGET_FPS))
-
-        self.add_event_handler("init", self.on_init)
-        self.add_event_handler("deinit", self.on_deinit)
-
         self.calibrator = Calibrator()
         self.calibrator_params = BehaviorSubject(
             {
@@ -87,6 +88,16 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
                 "square_size": 30,
             }
         )
+
+        self.stereo_image_observable = rx.combine_latest(
+            self.left_image_subject,
+            self.right_image_subject,
+            self.timestamp_subject,
+            self.calibrator.is_calibrating,
+        ).pipe(throttle_first(1 / StereoVslamExtension.TARGET_FPS))
+
+        self.add_event_handler("init", self.on_init)
+        self.add_event_handler("deinit", self.on_deinit)
 
         self._stereo_image_disposer = None
         self._calibrator_disposer = None
@@ -103,9 +114,9 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             event.is_success = False
             return
 
-        self._stereo_image_disposer = self.stereo_image_observable.subscribe(
-            on_next=self.process_images
-        )
+        self._stereo_image_disposer = rx.combine_latest(
+            self.stereo_image_observable, self.calibrator.stereo_camera_info
+        ).subscribe(on_next=self.process_images)
 
         self._calibrator_disposer = self.stereo_image_observable.pipe(
             throttle_first(0.8)
@@ -157,16 +168,32 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         self.main_window.protocol("WM_DELETE_WINDOW", on_close)
 
     def process_images(
-        self, stereo_images: Tuple[Optional[Image], Optional[Image], int]
+        self,
+        images: Tuple[
+            Tuple[Optional[Image], Optional[Image], int, bool],
+            Optional[StereoCameraInfo],
+        ],
     ):
-        left_image, right_image, timestamp = stereo_images
-        if left_image is None or right_image is None or self._ros_bridge is None:
+        stereo_images, camera_info = images
+        left_image, right_image, timestamp, is_calibrating = stereo_images
+
+        if (
+            left_image is None
+            or right_image is None
+            or camera_info is None
+            or self._ros_bridge is None
+            or is_calibrating
+        ):
             return
 
-        self._ros_bridge.send_stereo_image(left_image, right_image, timestamp)
+        left_camera_info, right_camera_info, _stereo_info = camera_info
+
+        self._ros_bridge.send_stereo_image(
+            left_image, right_image, left_camera_info, right_camera_info, timestamp
+        )
 
     def start_calibration(self):
         self.calibrator.start(self.calibrator_params.value)
 
     def stop_calibration(self):
-        self.calibrator.stop()
+        self.calibrator.pause()
