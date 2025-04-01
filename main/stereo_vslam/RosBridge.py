@@ -2,11 +2,13 @@ import cv2
 import numpy as np
 import rosgraph
 import rospy
+import sensor_msgs.point_cloud2 as pc2
 from cv_bridge import CvBridge
 from PIL.Image import Image
-from rospy import Publisher, Time
+from rospy import Publisher, Subscriber, Time
 from sensor_msgs.msg import CameraInfo as CameraInfoRos
 from sensor_msgs.msg import Image as ImageRos
+from sensor_msgs.msg import PointCloud2
 
 from stereo_vslam.Calibrator import CameraInfo
 
@@ -18,6 +20,7 @@ class RosBridge:
     right_image_pub: Publisher
     left_camera_info_pub: Publisher
     right_camera_info_pub: Publisher
+    cloud_map_sub: Subscriber
 
     def __init__(self):
         if not rosgraph.is_master_online():
@@ -37,6 +40,10 @@ class RosBridge:
         )
         self.right_camera_info_pub = Publisher(
             "/stereo_camera/right/camera_info", CameraInfoRos, queue_size=10
+        )
+
+        self.cloud_map_sub = Subscriber(
+            "/cloud_map", PointCloud2, self.process_cloud_map, queue_size=10
         )
 
     def _image_to_imgmsg(self, img: Image) -> ImageRos:
@@ -87,9 +94,16 @@ class RosBridge:
         self.left_image_pub.publish(left_image_msg)
         self.right_image_pub.publish(right_image_msg)
 
+    def process_cloud_map(self, cloud_map: PointCloud2):
+        points = pc2.read_points_list(
+            cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
+        )
+        print(len(points))
+
     def destroy(self):
-        rospy.signal_shutdown("Don't need anymore")
         self.left_image_pub.unregister()
         self.right_image_pub.unregister()
         self.left_camera_info_pub.unregister()
         self.right_camera_info_pub.unregister()
+        self.cloud_map_sub.unregister()
+        rospy.signal_shutdown("Don't need anymore")
