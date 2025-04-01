@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Set, Tuple
 
 from cv2.typing import MatLike
 from PIL.Image import Image, fromarray
@@ -12,8 +12,9 @@ from app.events.AbstractEvent import AbstractEvent
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main as AppMain
 from app.ui.MenuBar import MenuBar
+from app.ui.utils import safe_callback
 from euroc_mav_loader.DatasetLoader import DatasetLoader, Metadata
-from euroc_mav_loader.Player import Player
+from euroc_mav_loader.Player import Player, PlayerState
 from euroc_mav_loader.ui.Main import Main
 from stereo_vslam import StereoVslamExtension
 
@@ -26,7 +27,7 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
     main_window: Optional[Main]
     dataset_loader: Optional[DatasetLoader]
     player: Optional[Player[Tuple[MatLike, MatLike, Metadata]]]
-    relay_dispose: Optional[DisposableBase]
+    _disposers: Set[DisposableBase]
 
     @override
     @staticmethod
@@ -51,7 +52,7 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
         self.main_window = None
 
         self.player = None
-        self.relay_dispose = None
+        self._disposers = set()
 
     def on_init(self, event: AbstractEvent):
         if self.container is None:
@@ -71,14 +72,16 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
         )
 
     def on_deinit(self, _event: AbstractEvent):
-
         if self.player is not None:
             self.player.dispose()
             self.player = None
 
-        if self.relay_dispose is not None:
-            self.relay_dispose.dispose()
-            self.relay_dispose = None
+        for disposer in self._disposers:
+            disposer.dispose()
+        self._disposers = set()
+
+        if self.main_window is not None:
+            self.main_window.destroy()
 
         self.dataset_loader = None
 
@@ -90,6 +93,13 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
             pass
 
     def load_dataset(self, path: str):
+        if self.player is not None:
+            self.player.dispose()
+
+        for disposer in self._disposers:
+            disposer.dispose()
+        self._disposers = set()
+
         self.dataset_loader = DatasetLoader(path)
 
         images = iter(self.dataset_loader)
@@ -111,9 +121,19 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
             self.stereo_vslam.right_image_subject.on_next(inp[1])
             self.stereo_vslam.timestamp_subject.on_next(inp[2])
 
-        self.relay_dispose = relay_subject.subscribe(on_next=relay)
+        self._disposers.add(relay_subject.subscribe(on_next=relay))
 
         self.player = Player(images, transformer_subject)
+
+        def update_player_state(state: PlayerState):
+            if self.main_window is not None:
+                self.main_window.update_player_state(state)
+
+        self._disposers.add(
+            self.player.state_subject.subscribe(
+                safe_callback(self.main_window, update_player_state)
+            )
+        )
 
     def open_window(self):
         if self.container is None:
@@ -136,6 +156,9 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
             self.main_window = None
 
         self.main_window.protocol("WM_DELETE_WINDOW", on_close)
+        self.main_window.update_player_state(
+            None if self.player is None else self.player.state
+        )
 
     @property
     @override

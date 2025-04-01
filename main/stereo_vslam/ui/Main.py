@@ -1,5 +1,5 @@
-import threading
 import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Optional, Set, Tuple
 
 from PIL.Image import Image
@@ -35,6 +35,8 @@ class Main(tk.Toplevel):
     right_image: ImageLabel
     disparity_image: ImageLabel
 
+    calibration_executor: ThreadPoolExecutor
+
     disposers: Set[DisposableBase]
 
     inspect_x: tk.IntVar
@@ -53,6 +55,7 @@ class Main(tk.Toplevel):
         self.title("Stereo VSLAM")
 
         self.disposers = set()
+        self.calibration_executor = ThreadPoolExecutor(max_workers=1)
 
         self.menu_bar = MenuBar(self, extension)
         _ = self.config(menu=self.menu_bar)
@@ -281,14 +284,14 @@ class Main(tk.Toplevel):
 
     def end_calibration(self):
         self.extension.calibrator.stop()
-        thread = threading.Thread(
-            target=self.extension.calibrator.update_calibration, daemon=True
+        _ = self.calibration_executor.submit(
+            self.extension.calibrator.update_calibration
         )
-        thread.start()
 
     @override
     def destroy(self) -> None:
         for disposer in self.disposers:
             disposer.dispose()
         self.disposers = set()
+        self.calibration_executor.shutdown(False)
         return super().destroy()

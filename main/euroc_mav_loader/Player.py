@@ -10,10 +10,19 @@ from reactivex.subject import BehaviorSubject, Subject
 from typing_extensions import TypeAlias
 
 from app.EventEmiter import EventEmitter
+from app.events.AbstractEvent import AbstractEvent
 
 T = TypeVar("T")
 
 PlayerState: TypeAlias = Literal["playing", "idle", "paused", "completed"]
+
+
+class PlayerEvent(AbstractEvent):
+    state: PlayerState
+
+    def __init__(self, state: PlayerState) -> None:
+        super().__init__()
+        self.state = state
 
 
 class Player(EventEmitter, Generic[T]):
@@ -21,7 +30,7 @@ class Player(EventEmitter, Generic[T]):
     _frame_rate: float
     _frame_interval: float
     subject: Subject[T]
-    state_subject: Subject[PlayerState]
+    state_subject: BehaviorSubject[PlayerState]
     executor: ThreadPoolExecutor
     scheduler: ThreadPoolScheduler
 
@@ -47,7 +56,7 @@ class Player(EventEmitter, Generic[T]):
         self,
         data_iterator: Iterator[T],
         subject: Optional[Subject[T]] = None,
-        state_subject: Optional[Subject[PlayerState]] = None,
+        state_subject: Optional[BehaviorSubject[PlayerState]] = None,
         frame_rate: float = 20.0,
     ):
         """
@@ -58,6 +67,8 @@ class Player(EventEmitter, Generic[T]):
             subject: RxPy Subject for emitting frames (created if None)
             frame_rate: Playback rate in frames per second (default: 10 fps)
         """
+        super().__init__()
+
         self.data_iterator = data_iterator
         self._frame_rate = frame_rate
         self._frame_interval = 1.0 / frame_rate
@@ -119,19 +130,20 @@ class Player(EventEmitter, Generic[T]):
             self._playback_thread = self.executor.submit(self._playback_task)
 
             self.state_subject.on_next("playing")
+            self.emit_event("start", PlayerEvent("playing"))
 
             return True
 
     def pause(self):
         """Pause playback"""
         with self._lock:
-            if not self._running or self._stop_requested:
+            if not self._running or self._paused or self._stop_requested:
                 return False
 
-            was_paused = self._paused
-            self._paused = not was_paused
+            self._paused = True
 
             self.state_subject.on_next("paused")
+            self.emit_event("paused", PlayerEvent("paused"))
 
             return True
 
@@ -144,6 +156,7 @@ class Player(EventEmitter, Generic[T]):
             self._paused = False
 
             self.state_subject.on_next("playing")
+            self.emit_event("resume", PlayerEvent("playing"))
 
             return True
 
@@ -166,6 +179,7 @@ class Player(EventEmitter, Generic[T]):
                     pass
 
             self.state_subject.on_next("idle")
+            self.emit_event("stop", PlayerEvent("idle"))
             return True
 
     def step(self):
@@ -183,10 +197,11 @@ class Player(EventEmitter, Generic[T]):
             self.subject.on_next(frame)
 
             return True
+
         except StopIteration:
             self.subject.on_completed()
-
-            self.state_subject.on_next("idle")
+            self.emit_event("completed", PlayerEvent("completed"))
+            self.state_subject.on_next("completed")
 
             return False
 
@@ -279,8 +294,7 @@ class Player(EventEmitter, Generic[T]):
                 except StopIteration:
                     # End of iterator reached
                     self.subject.on_completed()
-
-                    self.state_subject.on_next("idle")
+                    self.state_subject.on_next("completed")
 
                     break
 
@@ -293,9 +307,13 @@ class Player(EventEmitter, Generic[T]):
                 self._paused = False
                 self._stop_requested = False
 
+    @property
+    def state(self):
+        return self.state_subject.value
+
     def dispose(self):
         """Gracefully stop the player and release resources."""
         _ = self.stop()
-        self.executor.shutdown(wait=True)
+        self.executor.shutdown(wait=False)
         self.subject.on_completed()
         self.state_subject.on_completed()

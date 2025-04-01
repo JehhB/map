@@ -1,13 +1,12 @@
 import tkinter as tk
 from tkinter import filedialog
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Set
 
 import reactivex.operators as ops
-from reactivex.abc import DisposableBase
-from typing_extensions import override
 
 from app.Container import Container
 from app.ui.ImageLabel import ImageLabel
+from euroc_mav_loader.Player import PlayerState
 from stereo_vslam import StereoVslamExtension
 
 if TYPE_CHECKING:
@@ -28,6 +27,13 @@ class Main(tk.Toplevel):
     right_image: ImageLabel
 
     fps_callback: str
+
+    start_map_button: tk.Button
+    start_calib_button: tk.Button
+    pause_button: tk.Button
+    step_button: tk.Button
+    play_button: tk.Button
+    stop_button: tk.Button
 
     def __init__(
         self,
@@ -95,29 +101,29 @@ class Main(tk.Toplevel):
         tk.Scale(
             control_frame, from_=5, to=60, variable=self.fps, orient=tk.HORIZONTAL
         ).pack(side=tk.LEFT, expand=tk.YES, fill=tk.X, padx=4)
-
         self.fps_callback = self.fps.trace_add("write", self.set_fps)
 
-        tk.Button(control_frame, text="Start Mapping", command=self.start).pack(
-            side=tk.LEFT, padx=4
+        self.start_map_button = tk.Button(
+            control_frame, text="Start Mapping", command=self.start
         )
+        self.start_map_button.pack(side=tk.LEFT, padx=4)
 
-        tk.Button(
+        self.start_calib_button = tk.Button(
             control_frame, text="Start Callibration", command=self.start_calibration
-        ).pack(side=tk.LEFT, padx=4)
+        )
+        self.start_calib_button.pack(side=tk.LEFT, padx=4)
 
-        tk.Button(control_frame, text="Pause", state="disabled").pack(
-            side=tk.LEFT, padx=4
-        )
-        tk.Button(control_frame, text="Step", state="disabled").pack(
-            side=tk.LEFT, padx=4
-        )
-        tk.Button(control_frame, text="Play", state="disabled").pack(
-            side=tk.LEFT, padx=4
-        )
-        tk.Button(control_frame, text="Stop", state="disabled").pack(
-            side=tk.LEFT, padx=4
-        )
+        self.pause_button = tk.Button(control_frame, text="Pause", command=self.pause)
+        self.pause_button.pack(side=tk.LEFT, padx=4)
+
+        self.step_button = tk.Button(control_frame, text="Step", command=self.step)
+        self.step_button.pack(side=tk.LEFT, padx=4)
+
+        self.play_button = tk.Button(control_frame, text="Play", command=self.play)
+        self.play_button.pack(side=tk.LEFT, padx=4)
+
+        self.stop_button = tk.Button(control_frame, text="Stop", command=self.stop)
+        self.stop_button.pack(side=tk.LEFT, padx=4)
 
         control_frame.pack(padx=8, pady=8, expand=tk.YES, fill=tk.X)
 
@@ -165,12 +171,52 @@ class Main(tk.Toplevel):
             }
         )
         self._stereo_extension.start_calibration()
-        self.start()
+        if self._extension.player is None:
+            return
+        _ = self._extension.player.start()
 
     def start(self):
         if self._extension.player is None:
             return
-        self._extension.player.start()
+        self._stereo_extension.stop_calibration()
+        _ = self._extension.player.start()
+
+    def play(self):
+        if self._extension.player is None:
+            return
+        _ = self._extension.player.resume()
+
+    def pause(self):
+        if self._extension.player is None:
+            return
+        _ = self._extension.player.pause()
+
+    def stop(self):
+        if self._extension.player is None:
+            return
+        if (
+            self._stereo_extension.calibrator.is_calibrating.value
+            and self._stereo_extension.calibrator.number_of_samples.value
+            > self._stereo_extension.calibrator.MINIMUM_NUMBER_SAMPLE
+        ):
+            _ = self._stereo_extension.calibrator.update_calibration()
+        _ = self._extension.player.stop()
+
+    def step(self):
+        if self._extension.player is None:
+            return
+        _ = self._extension.player.step()
+
+    def update_player_state(self, state: Optional[PlayerState] = None):
+        def set_state(button: tk.Button, *states: Optional[PlayerState]):
+            _ = button.config(state="normal" if state in states else "disabled")
+
+        set_state(self.start_map_button, "idle")
+        set_state(self.start_calib_button, "idle")
+        set_state(self.pause_button, "playing")
+        set_state(self.step_button, "playing", "paused")
+        set_state(self.play_button, "paused")
+        set_state(self.stop_button, "paused", "playing")
 
     def set_fps(self, _a: str, _b: str, _c: str):
         if self._extension.player is None:

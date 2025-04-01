@@ -167,3 +167,6 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
     def start_calibration(self):
         self.calibrator.start(self.calibrator_params.value)
+
+    def stop_calibration(self):
+        self.calibrator.stop()

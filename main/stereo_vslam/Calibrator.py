@@ -46,7 +46,7 @@ class Calibrator:
 
     is_calibrating: BehaviorSubject[bool]
 
-    number_of_samples: Subject[int]
+    number_of_samples: BehaviorSubject[int]
     left_image_with_drawing: Subject[Image.Image]
     right_image_with_drawing: Subject[Image.Image]
     stereo_camera_info: Subject[
