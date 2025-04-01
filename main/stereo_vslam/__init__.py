@@ -31,7 +31,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
 
     menu_bar: MenuBar
     main_window: Optional[Main]
-    _ros_bridge: Optional[RosBridge]
+    ros_bridge: Optional[RosBridge]
 
     left_image_subject: rx.Subject[Optional[Image]]
     right_image_subject: rx.Subject[Optional[Image]]
@@ -73,7 +73,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         super().__init__()
 
         self.main_window = None
-        self._ros_bridge = None
+        self.ros_bridge = None
         self.lock = Lock()
         self._stereo_image_disposer = None
 
@@ -84,8 +84,8 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         self.calibrator = Calibrator()
         self.calibrator_params = BehaviorSubject(
             {
-                "chessboard_size": (6, 7),
-                "square_size": 30,
+                "chessboard_size": (7, 6),
+                "square_size": 3,
             }
         )
 
@@ -108,7 +108,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             return
 
         try:
-            self._ros_bridge = RosBridge()
+            self.ros_bridge = RosBridge()
         except RuntimeError as e:
             event.detail = e
             event.is_success = False
@@ -128,9 +128,9 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         )
 
     def on_deinit(self, _event: AbstractEvent):
-        if self._ros_bridge is not None:
-            self._ros_bridge.destroy()
-            self._ros_bridge = None
+        if self.ros_bridge is not None:
+            self.ros_bridge.destroy()
+            self.ros_bridge = None
 
         if self._stereo_image_disposer is not None:
             self._stereo_image_disposer.dispose()
@@ -181,14 +181,14 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             left_image is None
             or right_image is None
             or camera_info is None
-            or self._ros_bridge is None
+            or self.ros_bridge is None
             or is_calibrating
         ):
             return
 
         left_camera_info, right_camera_info, _stereo_info = camera_info
 
-        self._ros_bridge.send_stereo_image(
+        self.ros_bridge.send_stereo_image(
             left_image,
             right_image,
             left_camera_info,

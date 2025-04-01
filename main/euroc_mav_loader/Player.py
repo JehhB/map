@@ -95,8 +95,6 @@ class Player(EventEmitter, Generic[T]):
         self.current_frame = None
         self.frame_count = 0
 
-        _ = self.step()
-
     @property
     def frame_rate(self):
         """Get the current frame rate"""

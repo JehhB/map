@@ -1,14 +1,20 @@
+from typing import Optional, Tuple
+
 import cv2
 import numpy as np
 import rosgraph
 import rospy
 import sensor_msgs.point_cloud2 as pc2
+from cv2.typing import MatLike
 from cv_bridge import CvBridge
 from PIL.Image import Image
+from reactivex import Observable, operators
+from reactivex.subject import BehaviorSubject
 from rospy import Publisher, Subscriber, Time
 from sensor_msgs.msg import CameraInfo as CameraInfoRos
 from sensor_msgs.msg import Image as ImageRos
 from sensor_msgs.msg import PointCloud2
+from stereo_msgs.msg import DisparityImage
 
 from stereo_vslam.Calibrator import CameraInfo
 
@@ -21,6 +27,11 @@ class RosBridge:
     left_camera_info_pub: Publisher
     right_camera_info_pub: Publisher
     cloud_map_sub: Subscriber
+
+    disparity_image_sub: Subscriber
+    disparity_subject: BehaviorSubject[Optional[DisparityImage]]
+    disparity_mat_observable: Observable[Optional[Tuple[DisparityImage, MatLike]]]
+    disparity_image_observable: Observable[Optional[MatLike]]
 
     def __init__(self):
         if not rosgraph.is_master_online():
@@ -44,6 +55,21 @@ class RosBridge:
 
         self.cloud_map_sub = Subscriber(
             "/cloud_map", PointCloud2, self.process_cloud_map, queue_size=10
+        )
+
+        self.disparity_subject = BehaviorSubject(None)
+        self.disparity_image_sub = Subscriber(
+            "/stereo_camera/disparity",
+            DisparityImage,
+            self.disparity_subject.on_next,
+            queue_size=10,
+        )
+
+        self.disparity_mat_observable = self.disparity_subject.pipe(
+            operators.map(self.convert_disparity_to_mat)
+        )
+        self.disparity_image_observable = self.disparity_mat_observable.pipe(
+            operators.map(self.convert_mat_to_img)
         )
 
     def _image_to_imgmsg(self, img: Image) -> ImageRos:
@@ -95,10 +121,9 @@ class RosBridge:
         self.right_image_pub.publish(right_image_msg)
 
     def process_cloud_map(self, cloud_map: PointCloud2):
-        points = pc2.read_points_list(
+        _points = pc2.read_points_list(
             cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
         )
-        print(len(points))
 
     def destroy(self):
         self.left_image_pub.unregister()
@@ -106,4 +131,28 @@ class RosBridge:
         self.left_camera_info_pub.unregister()
         self.right_camera_info_pub.unregister()
         self.cloud_map_sub.unregister()
+        self.disparity_image_sub.unregister()
+        self.disparity_subject.on_completed()
         rospy.signal_shutdown("Don't need anymore")
+
+    def convert_disparity_to_mat(
+        self, disparity: Optional[DisparityImage]
+    ) -> Optional[Tuple[DisparityImage, MatLike]]:
+        if disparity is None:
+            return None
+
+        return (disparity, self.bridge.imgmsg_to_cv2(disparity.image))
+
+    def convert_mat_to_img(
+        self,
+        inp: Optional[Tuple[DisparityImage, MatLike]],
+    ) -> Optional[MatLike]:
+        if inp is None:
+            return None
+
+        disparity, disp = inp
+        min = disparity.min_disparity
+        max = disparity.max_disparity
+
+        mapped = (np.clip(disp, min, max) - min) / (max - min) * 255
+        return mapped.astype(np.uint8)

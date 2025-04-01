@@ -16,6 +16,7 @@ from app.ui.utils import (
     safe_parse_int,
 )
 from stereo_vslam.Calibrator import CalibratorParams
+from stereo_vslam.ui.DisparityImage import DisparityImage
 from stereo_vslam.ui.MenuBar import MenuBar
 
 if TYPE_CHECKING:
@@ -43,6 +44,7 @@ class Main(tk.Toplevel):
     inspect_x: tk.IntVar
     inspect_y: tk.IntVar
     inspect_disparity: tk.DoubleVar
+    inspect_depth: tk.DoubleVar
 
     def __init__(
         self,
@@ -104,11 +106,11 @@ class Main(tk.Toplevel):
             return out
 
         board_x_subject = MappedBehaviourSubject(
-            "7",
+            "8",
             self.extension.calibrator_params,
             lambda params: str(params["chessboard_size"][0]),
             lambda val, params: update_calibrator_params(
-                params, size=(safe_parse_int(val, 7), None)
+                params, size=(safe_parse_int(val, 8), None)
             ),
         )
         board_x = tk.Spinbox(
@@ -122,11 +124,11 @@ class Main(tk.Toplevel):
         board_x.grid(row=0, column=1, pady=4, padx=4, sticky="ew")
 
         board_y_subject = MappedBehaviourSubject(
-            "8",
+            "7",
             self.extension.calibrator_params,
             lambda params: str(params["chessboard_size"][1]),
             lambda val, params: update_calibrator_params(
-                params, size=(None, safe_parse_int(val, 8))
+                params, size=(None, safe_parse_int(val, 7))
             ),
         )
         board_y = tk.Spinbox(
@@ -139,16 +141,16 @@ class Main(tk.Toplevel):
         self.disposers.add(bind_subject_to_widget(board_y, board_y_subject))
         board_y.grid(row=0, column=2, pady=4, padx=4, sticky="ew")
 
-        tk.Label(calibration_frame, text="Square size (in mm)").grid(
+        tk.Label(calibration_frame, text="Square size (in cm)").grid(
             row=1, column=0, pady=4, padx=8, sticky="e"
         )
 
         square_size_subject = MappedBehaviourSubject(
-            "30.0",
+            "3.0",
             self.extension.calibrator_params,
             lambda params: str(params["square_size"]),
             lambda val, params: update_calibrator_params(
-                params, square_size=safe_parse_float(val, 30.0)
+                params, square_size=safe_parse_float(val, 3.0)
             ),
         )
         square_size = tk.Spinbox(
@@ -232,6 +234,7 @@ class Main(tk.Toplevel):
         self.inspect_x = tk.IntVar(self, value=None)
         self.inspect_y = tk.IntVar(self, value=None)
         self.inspect_disparity = tk.DoubleVar(self, value=None)
+        self.inspect_depth = tk.DoubleVar(self, value=None)
 
         inspect_frame = tk.LabelFrame(self, text="Inspect")
 
@@ -267,6 +270,18 @@ class Main(tk.Toplevel):
             state="readonly",
         ).grid(row=1, column=1, pady=4, padx=4, columnspan=2, sticky="ew")
 
+        tk.Label(inspect_frame, text="Depth (in m)").grid(
+            row=1, column=0, pady=4, padx=8, sticky="e"
+        )
+
+        tk.Entry(
+            inspect_frame,
+            textvariable=self.inspect_depth,
+            width=0,
+            justify=tk.RIGHT,
+            state="readonly",
+        ).grid(row=1, column=1, pady=4, padx=4, columnspan=2, sticky="ew")
+
         inspect_frame.grid(
             row=2, column=0, pady=4, ipady=4, padx=8, ipadx=8, sticky="new"
         )
@@ -275,12 +290,16 @@ class Main(tk.Toplevel):
 
         disparity_frame = tk.LabelFrame(self, text="Disparity")
 
-        self.disparity_image = ImageLabel(
+        self.disparity_image = DisparityImage(
             disparity_frame,
+            x_variable=self.inspect_x,
+            y_variable=self.inspect_y,
+            depth_variable=self.inspect_depth,
+            disparity_variable=self.inspect_disparity,
+            ros_bridge=self.extension.ros_bridge,
             width=Main.DEFAULT_DISPARITY_WIDTH,
             height=Main.DEFAULT_DISPARITY_HEIGHT,
         )
-
         self.disparity_image.pack(padx=8, pady=8)
 
         disparity_frame.grid(row=0, column=1, padx=8, pady=4, rowspan=3, sticky="nwes")

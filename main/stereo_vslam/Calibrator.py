@@ -93,7 +93,7 @@ class Calibrator:
 
     def start(self, params: CalibratorParams):
         self.chessboard_size = params["chessboard_size"]
-        self.square_size = params["square_size"] / 1000
+        self.square_size = params["square_size"] / 100
         self.objp = np.zeros(
             (self.chessboard_size[0] * self.chessboard_size[1], 3), np.float32
         )

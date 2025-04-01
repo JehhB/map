@@ -51,7 +51,7 @@ class Main(tk.Toplevel):
 
         self.folder_path = tk.StringVar(
             self,
-            "/mnt/c/Users/ASUS/Downloads/cam_checkerboard",
+            "/mnt/c/Users/ASUS/Downloads/V1_01_easy",
         )
         self.fps = tk.IntVar(self, 20)
 
@@ -99,7 +99,7 @@ class Main(tk.Toplevel):
 
         tk.Label(control_frame, text="Speed").pack(side=tk.LEFT)
         tk.Scale(
-            control_frame, from_=5, to=60, variable=self.fps, orient=tk.HORIZONTAL
+            control_frame, from_=5, to=40, variable=self.fps, orient=tk.HORIZONTAL
         ).pack(side=tk.LEFT, expand=tk.YES, fill=tk.X, padx=4)
         self.fps_callback = self.fps.trace_add("write", self.set_fps)
 
@@ -167,7 +167,7 @@ class Main(tk.Toplevel):
         self._stereo_extension.calibrator_params.on_next(
             {
                 "chessboard_size": (7, 6),
-                "square_size": 60.0,
+                "square_size": 6.0,
             }
         )
         self._stereo_extension.start_calibration()
