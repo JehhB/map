@@ -69,6 +69,7 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
             event.is_success = False
             event.detail = RuntimeError("Stereo VSLAM Extension is not active")
             return
+
         if not self.stereo_vslam.calibrator.load(DEFAULT_CAMERA_INFO):
             event.is_success = False
             event.detail = RuntimeError("Failed to load default camera info")

@@ -64,9 +64,8 @@ class RosBridge:
         right_image: Image,
         left_camera_info: CameraInfo,
         right_camera_info: CameraInfo,
-        timestamp: int,
     ):
-        current_time = Time.from_sec(timestamp / 1e9)
+        current_time = Time.now()
 
         left_image_msg = self._image_to_imgmsg(left_image)
         right_image_msg = self._image_to_imgmsg(right_image)
@@ -74,9 +73,14 @@ class RosBridge:
         right_camera_info_msg = self._caminfo_to_caminfomsg(right_camera_info)
 
         left_image_msg.header.stamp = current_time
+        left_image_msg.header.frame_id = "stereo_camera"
         right_image_msg.header.stamp = current_time
+        right_image_msg.header.frame_id = "stereo_camera"
+
         left_camera_info_msg.header.stamp = current_time
+        left_camera_info_msg.header.frame_id = "stereo_camera"
         right_camera_info_msg.header.stamp = current_time
+        right_camera_info_msg.header.frame_id = "stereo_camera"
 
         self.left_camera_info_pub.publish(left_camera_info_msg)
         self.right_camera_info_pub.publish(right_camera_info_msg)

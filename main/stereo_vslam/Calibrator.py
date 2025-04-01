@@ -1,6 +1,4 @@
-import os
 from dataclasses import dataclass
-from fileinput import filename
 from typing import List, Optional, Tuple, TypedDict
 
 import cv2
@@ -31,6 +29,7 @@ class StereoInfo:
     disparity_to_depth_matrix: MatLike
     essential_matrix: MatLike
     fundamental_matrix: MatLike
+    translation_vector: MatLike
     error: float
 
 
@@ -258,6 +257,7 @@ class Calibrator:
                 disparity_to_depth_matrix=Q,
                 essential_matrix=E,
                 fundamental_matrix=F,
+                translation_vector=T,
                 error=ret,
             ),
         )
@@ -336,8 +336,9 @@ class Calibrator:
             "disparity_to_depth_matrix": (
                 stereo_info.disparity_to_depth_matrix.tolist()
             ),
-            "essential_matrix": (stereo_info.essential_matrix.tolist()),
-            "fundamental_matrix": (stereo_info.fundamental_matrix.tolist()),
+            "essential_matrix": stereo_info.essential_matrix.tolist(),
+            "fundamental_matrix": stereo_info.fundamental_matrix.tolist(),
+            "translation_vector": stereo_info.translation_vector.tolist(),
             "error": stereo_info.error,
         }
 
@@ -405,6 +406,7 @@ class Calibrator:
                 ),
                 essential_matrix=np.array(stereo_data["essential_matrix"]),
                 fundamental_matrix=np.array(stereo_data["fundamental_matrix"]),
+                translation_vector=np.array(stereo_data["translation_vector"]),
                 error=stereo_data["error"],
             )
 

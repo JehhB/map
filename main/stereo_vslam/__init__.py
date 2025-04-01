@@ -175,7 +175,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         ],
     ):
         stereo_images, camera_info = images
-        left_image, right_image, timestamp, is_calibrating = stereo_images
+        left_image, right_image, _timestamp, is_calibrating = stereo_images
 
         if (
             left_image is None
@@ -189,7 +189,10 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         left_camera_info, right_camera_info, _stereo_info = camera_info
 
         self._ros_bridge.send_stereo_image(
-            left_image, right_image, left_camera_info, right_camera_info, timestamp
+            left_image,
+            right_image,
+            left_camera_info,
+            right_camera_info,
         )
 
     def start_calibration(self):
