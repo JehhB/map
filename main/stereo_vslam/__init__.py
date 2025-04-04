@@ -6,7 +6,6 @@ from PIL.Image import Image
 from reactivex.abc import DisposableBase
 from reactivex.operators import throttle_first
 from reactivex.subject import BehaviorSubject
-from sensor_msgs.msg import CameraInfo
 from typing_extensions import Self, override
 
 from app.AbstractExtension import AbstractExtension, ExtensionMetadata
@@ -14,13 +13,9 @@ from app.Container import AbstractModule, ModuleDefinition
 from app.events.AbstractEvent import AbstractEvent
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main as AppMain
+from app.ui.MainGl import MainGl
 from app.ui.MenuBar import MenuBar
-from stereo_vslam.Calibrator import (
-    Calibrator,
-    CalibratorParams,
-    StereoCameraInfo,
-    StereoInfo,
-)
+from stereo_vslam.Calibrator import Calibrator, CalibratorParams, StereoCameraInfo
 from stereo_vslam.RosBridge import RosBridge
 from stereo_vslam.ui.Main import Main
 
@@ -30,6 +25,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
     TARGET_FPS: float = 20.0
 
     menu_bar: MenuBar
+    main_gl: MainGl
     main_window: Optional[Main]
     ros_bridge: Optional[RosBridge]
 
@@ -108,7 +104,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             return
 
         try:
-            self.ros_bridge = RosBridge()
+            self.ros_bridge = RosBridge(self)
         except RuntimeError as e:
             event.detail = e
             event.is_success = False
@@ -126,6 +122,7 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
         self.menu_bar.extension_menu.add_command(
             label=StereoVslamExtension.EXTENSION_LABEL, command=self.open_window
         )
+        self.main_gl = self.container[MainGl]
 
     def on_deinit(self, _event: AbstractEvent):
         if self.ros_bridge is not None:
@@ -144,6 +141,10 @@ class StereoVslamExtension(AbstractModule, AbstractExtension):
             )
         except:
             pass
+
+    def clear_ros(self):
+        if self.ros_bridge:
+            self.ros_bridge.reset_service()
 
     def open_window(self):
         if self.container is None:

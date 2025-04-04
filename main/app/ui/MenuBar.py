@@ -4,6 +4,8 @@ from typing import Optional
 from typing_extensions import override
 
 from app.Container import AbstractModule, Container, ModuleDefinition
+from app.EventEmiter import EventEmitter
+from app.events.AbstractEvent import AbstractEvent
 from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main
 from app.ui.ManageExtension import ManageExtension
@@ -28,6 +30,10 @@ class _RemovableItemMenu(tk.Menu):
         return False
 
 
+class MenuBarEvent(AbstractEvent):
+    pass
+
+
 class MenuBar(AbstractModule, _RemovableItemMenu):
     _container: Container
     file_menu: _RemovableItemMenu
@@ -36,6 +42,7 @@ class MenuBar(AbstractModule, _RemovableItemMenu):
     extension_menu: _RemovableItemMenu
 
     manage_extension_window: Optional[ManageExtension]
+    event_emitter: EventEmitter
 
     @override
     @staticmethod
@@ -62,6 +69,7 @@ class MenuBar(AbstractModule, _RemovableItemMenu):
         super().__init__(master, **kwargs)
 
         self._container = container
+        self.event_emitter = EventEmitter()
 
         self.file_menu = _RemovableItemMenu(self, tearoff=0)
         self.file_menu.add_command(label="Open", command=self.file_open)
@@ -113,7 +121,7 @@ class MenuBar(AbstractModule, _RemovableItemMenu):
         pass
 
     def edit_clear(self):
-        pass
+        self.event_emitter.emit_event("clear", MenuBarEvent())
 
     def edit_undo(self):
         pass

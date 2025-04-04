@@ -70,6 +70,11 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
             event.detail = RuntimeError("Stereo VSLAM Extension is not active")
             return
 
+        if not self.stereo_vslam.lock.acquire(timeout=1):
+            event.is_success = False
+            event.detail = RuntimeError("Stereo VSLAM Extension is already being used")
+            return
+
         if not self.stereo_vslam.calibrator.load(DEFAULT_CAMERA_INFO):
             event.is_success = False
             event.detail = RuntimeError("Failed to load default camera info")
@@ -81,6 +86,11 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
         )
 
     def on_deinit(self, _event: AbstractEvent):
+        if not self.is_active:
+            return
+
+        self.stereo_vslam.lock.release()
+
         if self.player is not None:
             self.player.dispose()
             self.player = None
@@ -132,6 +142,7 @@ class EuRoCMAVLoaderExtension(AbstractModule, AbstractExtension):
 
         self._disposers.add(relay_subject.subscribe(on_next=relay))
 
+        self.stereo_vslam.clear_ros()
         self.player = Player(images, transformer_subject)
 
         def update_player_state(state: PlayerState):

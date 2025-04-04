@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -10,13 +10,17 @@ from cv_bridge import CvBridge
 from PIL.Image import Image
 from reactivex import Observable, operators
 from reactivex.subject import BehaviorSubject
-from rospy import Publisher, Subscriber, Time
+from rospy import Publisher, ServiceProxy, Subscriber, Time
 from sensor_msgs.msg import CameraInfo as CameraInfoRos
 from sensor_msgs.msg import Image as ImageRos
 from sensor_msgs.msg import PointCloud2
+from std_srvs.srv import Empty
 from stereo_msgs.msg import DisparityImage
 
 from stereo_vslam.Calibrator import CameraInfo
+
+if TYPE_CHECKING:
+    from stereo_vslam import StereoVslamExtension
 
 
 class RosBridge:
@@ -33,12 +37,17 @@ class RosBridge:
     disparity_mat_observable: Observable[Optional[Tuple[DisparityImage, MatLike]]]
     disparity_image_observable: Observable[Optional[MatLike]]
 
-    def __init__(self):
+    reset_service: ServiceProxy
+
+    extension: "StereoVslamExtension"
+
+    def __init__(self, extension: "StereoVslamExtension"):
         if not rosgraph.is_master_online():
             raise RuntimeError("roscore is not running")
 
         rospy.init_node("main_map")
         self.bridge = CvBridge()
+        self.extension = extension
 
         self.left_image_pub = Publisher(
             "/stereo_camera/left/image_raw", ImageRos, queue_size=10
@@ -71,6 +80,8 @@ class RosBridge:
         self.disparity_image_observable = self.disparity_mat_observable.pipe(
             operators.map(self.convert_mat_to_img)
         )
+
+        self.reset_service = ServiceProxy("/reset", Empty)
 
     def _image_to_imgmsg(self, img: Image) -> ImageRos:
         img_np = np.array(img)
@@ -124,6 +135,35 @@ class RosBridge:
         _points = pc2.read_points_list(
             cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
         )
+        print(len(_points))
+
+    def process_cloud_map(self, cloud_map: PointCloud2):
+        # Extract points from ROS PointCloud2 message
+        cloud_map.fields[3].datatype = 6
+        _points = pc2.read_points_list(
+            cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
+        )
+
+        # Convert the points to a format suitable for the visualizer
+        # Each point needs to have position (x,y,z) and color (r,g,b)
+        point_data: List[float] = []
+
+        for point in _points:
+            x, y, z = point[0], point[1], point[2]
+
+            # Extract RGB from the packed format
+            rgb = point[3]
+            rgb_int = int(rgb)
+            # Unpack RGB values (typically stored as a 32-bit integer)
+            r = ((rgb_int >> 16) & 0xFF) / 255.0
+            g = ((rgb_int >> 8) & 0xFF) / 255.0
+            b = (rgb_int & 0xFF) / 255.0
+
+            # Add position and color for each point
+            point_data.extend([x, y, z, r, g, b])
+
+        points_array = np.array(point_data, dtype=np.float32)
+        self.extension.main_gl.set_points(points_array)
 
     def destroy(self):
         self.left_image_pub.unregister()
