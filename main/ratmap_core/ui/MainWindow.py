@@ -1,35 +1,35 @@
 import tkinter as tk
-from typing import Optional
 
 from typing_extensions import override
 
 from ratmap_common import EventTarget
 
+from .MainGl import MainGl
 from .MenuMain import MenuMain
 
 
 class MainWindow(tk.Tk):
-    main_menu: MenuMain
+
+    __main_menu: MenuMain
     __event_target: EventTarget
+    __main_gl: MainGl
 
-    def __init__(
-        self,
-        screenName: Optional[str] = None,
-        baseName: Optional[str] = None,
-        className: str = "Tk",
-        useTk: bool = True,
-        sync: bool = False,
-        use: Optional[str] = None,
-    ) -> None:
+    def __init__(self) -> None:
 
-        super().__init__(screenName, baseName, className, useTk, sync, use)
+        super().__init__()
         self.title("RatMap")
 
-        self.main_menu = MenuMain(self)
         self.__event_target = EventTarget()
-        self.main_menu.event_target.parent = self.__event_target
 
-        _ = self.config(menu=self.main_menu)
+        self.__main_menu = MenuMain(self)
+        self.__main_menu.event_target.parent = self.__event_target
+
+        self.__main_gl = MainGl(self)
+        self.__main_gl.event_target.parent = self.__event_target
+
+        self.__main_gl.pack(expand=tk.YES, fill=tk.BOTH)
+
+        _ = self.config(menu=self.__main_menu)
 
     @property
     def event_target(self):

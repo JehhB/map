@@ -1,10 +1,10 @@
 import os
 
-from ratmap_core import Application
-
 
 def main():
     os.environ["PYOPENGL_PLATFORM"] = "glx"
+
+    from ratmap_core import Application
 
     app = Application()
     app.mainloop()
