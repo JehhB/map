@@ -12,10 +12,12 @@ from .typing import BaseLabelKwargs, LabelKwargs
 from .util import sync_observable_to_variable
 
 
-class Label(ttk.Label, EventTarget):
+class Label(ttk.Label):
     __text_variable: tk.StringVar
     __text_observable: Optional[Observable[str]]
     __text_disposer: Optional[DisposableBase]
+
+    __event_target: EventTarget
 
     def __init__(
         self, master: Optional[tk.Misc] = None, **kwargs: Unpack[LabelKwargs]
@@ -34,7 +36,10 @@ class Label(ttk.Label, EventTarget):
 
         super().__init__(master, **cast(BaseLabelKwargs, kwargs), textvariable=variable)
 
+        self.__text_observable = None
         self.text_observable = text_observable
+
+        self.__event_target = EventTarget()
 
     @property
     def text_observable(self) -> Optional[Observable[str]]:
@@ -64,5 +69,5 @@ class Label(ttk.Label, EventTarget):
     def destroy(self) -> None:
         del self.__text_observable
 
-        self.dispose()
+        self.__event_target.dispose()
         return super().destroy()

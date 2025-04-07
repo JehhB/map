@@ -19,6 +19,7 @@ from .Button import Button, ButtonEvent
 from .Entry import Entry, EntryEvent
 from .ImageLabel import ImageLabel
 from .Label import Label
+from .Menu import Menu, MenuEvent, MenuEventDetail
 from .Scale import Scale, ScaleEvent
 from .Spinbox import Spinbox, SpinboxEvent
 
@@ -34,6 +35,9 @@ __all__ = [
     "Label",
     "LabeledScale",
     "LabelFrame",
+    "Menu",
+    "MenuEvent",
+    "MenuEventDetail",
     "Menubutton",
     "Notebook",
     "PanedWindow",

@@ -6,8 +6,7 @@ from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import Unpack, override
 
-from ratmap_common.AbstractEvent import AbstractEvent
-from ratmap_common.EventTarget import EventTarget
+from ratmap_common import AbstractEvent, EventTarget
 
 from .typing import BaseEntryKwargs, EntryKwargs
 from .util import bind_subject_to_variable, safe_callback
@@ -17,7 +16,7 @@ class EntryEvent(AbstractEvent):
     pass
 
 
-class Entry(ttk.Entry, EventTarget):
+class Entry(ttk.Entry):
     __state_observable: Optional[Observable[Literal["normal", "disabled", "readonly"]]]
     __state_disposer: Optional[DisposableBase]
 
@@ -28,6 +27,8 @@ class Entry(ttk.Entry, EventTarget):
 
     __focus_cbn: str
     __blur_cbn: str
+
+    __event_target: EventTarget
 
     def __init__(
         self, master: Optional[tk.Misc] = None, **kwargs: Unpack[EntryKwargs]
@@ -59,12 +60,18 @@ class Entry(ttk.Entry, EventTarget):
         self.state_observable = state_observable
         self.text_subject = text_subject
 
+        self.__event_target = EventTarget()
+
         self.__focus_cbn = self.bind(
-            "<FocusIn>", lambda _: self.emit("focus", EntryEvent())
+            "<FocusIn>", lambda _: self.__event_target.emit(EntryEvent("focus"), self)
         )
         self.__blur_cbn = self.bind(
-            "<FocusOut>", lambda _: self.emit("blur", EntryEvent())
+            "<FocusOut>", lambda _: self.__event_target.emit(EntryEvent("blur"), self)
         )
+
+    @property
+    def event_target(self):
+        return self.__event_target
 
     @property
     def state_observable(
@@ -113,9 +120,9 @@ class Entry(ttk.Entry, EventTarget):
             return
 
         def on_change_callback(new_val: str):
-            event = EntryEvent()
+            event = EntryEvent("on_change")
             event.detail = new_val
-            self.emit("on_change", event)
+            self.__event_target.emit(event)
 
         (self.__text_disposer, self.__text_write_cbn) = bind_subject_to_variable(
             subject, self.__text_variable, self, on_change_callback

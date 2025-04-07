@@ -1,10 +1,5 @@
 from .AbstractEvent import AbstractEvent
-from .AbstractExtension import (
-    AbstractExtension,
-    ExtensionMetadata,
-    ExtensionStartEvent,
-    ExtensionStopEvent,
-)
+from .AbstractExtension import AbstractExtension, ExtensionEvent, ExtensionMetadata
 from .CategorizedSubject import CategorizedSubject
 from .EventTarget import EventTarget
 
@@ -13,7 +8,6 @@ __all__ = [
     "AbstractExtension",
     "CategorizedSubject",
     "EventTarget",
+    "ExtensionEvent",
     "ExtensionMetadata",
-    "ExtensionStartEvent",
-    "ExtensionStopEvent",
 ]

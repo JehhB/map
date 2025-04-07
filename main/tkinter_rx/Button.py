@@ -6,8 +6,7 @@ from reactivex import Observable, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import Optional, Unpack, override
 
-from ratmap_common import EventTarget
-from ratmap_common.AbstractEvent import AbstractEvent
+from ratmap_common import AbstractEvent, EventTarget
 
 from .typing import BaseButtonKwargs, ButtonKwargs
 from .util import safe_callback, sync_observable_to_variable
@@ -17,7 +16,7 @@ class ButtonEvent(AbstractEvent):
     pass
 
 
-class Button(ttk.Button, EventTarget):
+class Button(ttk.Button):
     __command: Optional[Callable[[], None]]
 
     __text_variable: tk.StringVar
@@ -26,6 +25,8 @@ class Button(ttk.Button, EventTarget):
 
     __state_observable: Optional[Observable[Literal["normal", "active", "disabled"]]]
     __state_disposer: Optional[DisposableBase]
+
+    __event_target: EventTarget
 
     def __init__(
         self, master: Optional[tk.Misc] = None, **kwargs: Unpack[ButtonKwargs]
@@ -52,13 +53,21 @@ class Button(ttk.Button, EventTarget):
             textvariable=variable
         )
 
+        self.__text_observable = None
+        self.__state_observable = None
+
         self.text_observable = text_observable
         self.state_observable = state_observable
+        self.__event_target = EventTarget()
+
+    @property
+    def event_target(self):
+        return self.__event_target
 
     def __on_click_handler(self):
         if self.__command:
             self.__command()
-        self.emit("click", ButtonEvent())
+        self.__event_target.emit(ButtonEvent("click"))
 
     @property
     def text_observable(self) -> Optional[Observable[str]]:
@@ -121,5 +130,5 @@ class Button(ttk.Button, EventTarget):
         del self.state_observable
         del self.text_observable
 
-        self.dispose()
+        self.__event_target.dispose()
         return super().destroy()

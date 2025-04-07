@@ -8,19 +8,21 @@ from reactivex import Observable
 from reactivex.abc import DisposableBase
 from typing_extensions import Unpack, override
 
-from ratmap_common.EventTarget import EventTarget
+from ratmap_common import EventTarget
 
 from .typing import BaseImageLabelKwargs, ImageLabelKwargs
 from .util import safe_callback
 
 
-class ImageLabel(tk.Label, EventTarget):
+class ImageLabel(tk.Label):
     width: int
     height: int
     photo: Optional[ImageTk.PhotoImage]
 
     __image_observable: Optional[Observable[Union[Image.Image, MatLike, str, None]]]
     __disposer: Optional[DisposableBase]
+
+    __event_target: EventTarget
 
     def __init__(
         self,
@@ -37,6 +39,7 @@ class ImageLabel(tk.Label, EventTarget):
 
         super().__init__(master, **cast(BaseImageLabelKwargs, kwargs))
         self.__set_blank_image()
+        self.__event_target = EventTarget()
 
     @property
     def image_observable(self):
@@ -146,5 +149,5 @@ class ImageLabel(tk.Label, EventTarget):
     def destroy(self) -> None:
         del self.image_observable
 
-        self.dispose()
+        self.__event_target.dispose()
         return super().destroy()

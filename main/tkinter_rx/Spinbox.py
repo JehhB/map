@@ -6,7 +6,7 @@ from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import Unpack, override
 
-from ratmap_common.EventTarget import EventTarget
+from ratmap_common import EventTarget
 
 from .Entry import EntryEvent
 from .typing import BaseSpinboxKwargs, SpinboxKwargs
@@ -17,7 +17,7 @@ class SpinboxEvent(EntryEvent):
     pass
 
 
-class Spinbox(ttk.Spinbox, EventTarget):
+class Spinbox(ttk.Spinbox):
     __text_variable: tk.DoubleVar
 
     __value_subject: Optional[Subject[float]]
@@ -29,6 +29,8 @@ class Spinbox(ttk.Spinbox, EventTarget):
 
     __focus_cbn: str
     __blur_cbn: str
+
+    __event_target: EventTarget
 
     def __init__(
         self, master: Optional[tk.Misc] = None, **kwargs: Unpack[SpinboxKwargs]
@@ -51,15 +53,24 @@ class Spinbox(ttk.Spinbox, EventTarget):
         self.__value_write_cbn = None
         self.__state_disposer = None
 
+        self.__value_subject = None
+        self.__state_observable = None
+
         self.value_subject = value_subject
         self.state_observable = state_observable
 
+        self.__event_target = EventTarget()
+
         self.__focus_cbn = self.bind(
-            "<FocusIn>", lambda _: self.emit("focus", EntryEvent())
+            "<FocusIn>", lambda _: self.__event_target.emit(EntryEvent("focus"), self)
         )
         self.__blur_cbn = self.bind(
-            "<FocusOut>", lambda _: self.emit("blur", EntryEvent())
+            "<FocusOut>", lambda _: self.__event_target.emit(EntryEvent("blur"), self)
         )
+
+    @property
+    def event_target(self):
+        return self.__event_target
 
     @property
     def value_subject(self) -> Optional[Subject[float]]:
@@ -75,9 +86,9 @@ class Spinbox(ttk.Spinbox, EventTarget):
             return
 
         def on_change_callback(new_val: float):
-            event = SpinboxEvent()
+            event = SpinboxEvent("on_change")
             event.detail = new_val
-            self.emit("on_change", event)
+            self.__event_target.emit(event)
 
         (self.__value_disposer, self.__value_write_cbn) = bind_subject_to_variable(
             subject, self.__text_variable, self, on_change_callback
@@ -136,5 +147,5 @@ class Spinbox(ttk.Spinbox, EventTarget):
         self.unbind("<FocusIn>", self.__focus_cbn)
         self.unbind("<FocusOut>", self.__blur_cbn)
 
-        self.dispose()
+        self.__event_target.dispose()
         return super().destroy()

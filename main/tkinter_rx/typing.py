@@ -34,8 +34,8 @@ Cursor: TypeAlias = Union[
     str, Tuple[str], Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]
 ]
 Anchor: TypeAlias = Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"]
-ScreenUnits = Union[str, float]
-FontDescription = Union[
+ScreenUnits: TypeAlias = Union[str, float]
+FontDescription: TypeAlias = Union[
     str,
     Font,
     List[Any],
@@ -48,17 +48,15 @@ EntryValidateCommand: TypeAlias = Union[
     str, List[str], Tuple[str, ...], Callable[[], bool]
 ]
 XYScrollCommand: TypeAlias = Union[str, Callable[[float, float], object]]
+TakeFocusValue: TypeAlias = Union[
+    bool, Callable[[str], Optional[bool]], Literal[0, 1, ""]
+]
+ImageSpec: TypeAlias = Union[str, "Image"]
 
 
 class Image(Protocol):
     def width(self) -> int: ...
     def height(self) -> int: ...
-
-
-ImageSpec: TypeAlias = Union[str, Image]
-TakeFocusValue: TypeAlias = Union[
-    bool, Callable[[str], Optional[bool]], Literal[0, 1, ""]
-]
 
 
 class BaseButtonKwargs(TypedDict, total=False):
@@ -222,3 +220,62 @@ class ScaleKwargs(BaseScaleKwargs, total=False):
     variable: tkinter.DoubleVar
     value_subject: Subject[float]
     state_observable: Observable[Literal["normal", "disabled"]]
+
+
+class SubMenuKwargs(TypedDict, total=False):
+    activebackground: str
+    activeborderwidth: ScreenUnits
+    activeforeground: str
+    background: str
+    bd: ScreenUnits
+    bg: str
+    border: ScreenUnits
+    borderwidth: ScreenUnits
+    cursor: Cursor
+    disabledforeground: str
+    fg: str
+    font: FontDescription
+    foreground: str
+    name: str
+    postcommand: Union[Callable[[], object], str]
+    relief: Relief
+    selectcolor: str
+    takefocus: TakeFocusValue
+    tearoffcommand: Union[Callable[[str, str], object], str]
+    title: str
+    type: Literal["menubar", "tearoff", "normal"]
+
+
+class MenuKwargs(SubMenuKwargs, total=False):
+    tearoff: Union[bool, Literal[0, 1]]
+
+
+__all__ = [
+    "Anchor",
+    "BaseButtonKwargs",
+    "BaseEntryKwargs",
+    "BaseImageLabelKwargs",
+    "BaseLabelKwargs",
+    "BaseScaleKwargs",
+    "BaseSpinboxKwargs",
+    "ButtonCommand",
+    "ButtonKwargs",
+    "Compound",
+    "Cursor",
+    "EntryKwargs",
+    "EntryValidateCommand",
+    "FontDescription",
+    "Image",
+    "ImageLabelKwargs",
+    "ImageSpec",
+    "LabelKwargs",
+    "MenuKwargs",
+    "Relief",
+    "ScaleKwargs",
+    "ScreenUnits",
+    "SpinboxKwargs",
+    "SubMenuKwargs",
+    "TakeFocusValue",
+    "TtkCompound",
+    "XYScrollCommand",
+]

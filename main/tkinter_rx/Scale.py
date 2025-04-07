@@ -6,8 +6,7 @@ from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import Unpack, override
 
-from ratmap_common.AbstractEvent import AbstractEvent
-from ratmap_common.EventTarget import EventTarget
+from ratmap_common import AbstractEvent, EventTarget
 
 from .typing import BaseScaleKwargs, ScaleKwargs
 from .util import bind_subject_to_variable, safe_callback
@@ -17,7 +16,7 @@ class ScaleEvent(AbstractEvent):
     pass
 
 
-class Scale(ttk.Scale, EventTarget):
+class Scale(ttk.Scale):
     __state_observable: Optional[Observable[Literal["normal", "disabled"]]]
     __state_disposer: Optional[DisposableBase]
 
@@ -25,6 +24,8 @@ class Scale(ttk.Scale, EventTarget):
     __value_subject: Optional[Subject[float]]
     __value_disposer: Optional[DisposableBase]
     __value_write_cbn: Optional[str]
+
+    __event_target: EventTarget
 
     def __init__(
         self,
@@ -48,8 +49,17 @@ class Scale(ttk.Scale, EventTarget):
         self.__value_write_cbn = None
         self.__state_disposer = None
 
+        self.__value_subject = None
+        self.__state_observable = None
+
         self.value_subject = value_subject
         self.state_observable = state_observable
+
+        self.__event_target = EventTarget()
+
+    @property
+    def event_target(self):
+        return self.__event_target
 
     @property
     def value_subject(self) -> Optional[Subject[float]]:
@@ -65,9 +75,9 @@ class Scale(ttk.Scale, EventTarget):
             return
 
         def on_change_callback(new_val: float):
-            event = ScaleEvent()
+            event = ScaleEvent("on_change")
             event.detail = new_val
-            self.emit("on_change", event)
+            self.__event_target.emit(event)
 
         (self.__value_disposer, self.__value_write_cbn) = bind_subject_to_variable(
             subject, self.__variable, self, on_change_callback
@@ -123,5 +133,5 @@ class Scale(ttk.Scale, EventTarget):
         del self.value_subject
         del self.state_observable
 
-        self.dispose()
+        self.__event_target.dispose()
         return super().destroy()
