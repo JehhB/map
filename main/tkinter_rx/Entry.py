@@ -107,7 +107,7 @@ class Entry(ttk.Entry):
 
     @property
     def text_subject(self) -> Optional[Subject[str]]:
-        return self.text_subject
+        return self.__text_subject
 
     @text_subject.setter
     def text_subject(self, subject: Optional[Subject[str]]):

@@ -2,12 +2,6 @@ from threading import Lock
 from typing import Optional, Tuple
 
 import reactivex as rx
-from PIL.Image import Image
-from reactivex.abc import DisposableBase
-from reactivex.operators import throttle_first
-from reactivex.subject import BehaviorSubject
-from typing_extensions import Self, override
-
 from app.AbstractExtension import AbstractExtension, ExtensionMetadata
 from app.Container import AbstractModule, ModuleDefinition
 from app.events.AbstractEvent import AbstractEvent
@@ -15,9 +9,14 @@ from app.ExtensionManager import ExtensionManager
 from app.ui.Main import Main as AppMain
 from app.ui.MainGl import MainGl
 from app.ui.MenuBar import MenuBar
+from PIL.Image import Image
+from reactivex.abc import DisposableBase
+from reactivex.operators import throttle_first
+from reactivex.subject import BehaviorSubject
 from stereo_vslam.Calibrator import Calibrator, CalibratorParams, StereoCameraInfo
 from stereo_vslam.RosBridge import RosBridge
 from stereo_vslam.ui.Main import Main
+from typing_extensions import Self, override
 
 
 class StereoVslamExtension(AbstractModule, AbstractExtension):

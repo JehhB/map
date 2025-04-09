@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -19,9 +19,6 @@ from stereo_msgs.msg import DisparityImage
 
 from .CameraInfo import CameraInfo
 
-if TYPE_CHECKING:
-    from stereo_vslam import StereoVslamExtension
-
 
 class RosBridge:
     bridge: CvBridge
@@ -39,15 +36,12 @@ class RosBridge:
 
     reset_service: ServiceProxy
 
-    extension: "StereoVslamExtension"
-
-    def __init__(self, extension: "StereoVslamExtension"):
+    def __init__(self):
         if not rosgraph.is_master_online():
             raise RuntimeError("roscore is not running")
 
         rospy.init_node("main_map")
         self.bridge = CvBridge()
-        self.extension = extension
 
         self.left_image_pub = Publisher(
             "/stereo_camera/left/image_raw", ImageRos, queue_size=10
@@ -114,7 +108,7 @@ class RosBridge:
         left_image_msg = self.__image_to_imgmsg(left_image)
         right_image_msg = self.__image_to_imgmsg(right_image)
         left_camera_info_msg = self.__caminfo_to_caminfomsg(left_camera_info)
-        right_camera_info_msg = self._caminfo_to_caminfomsg(right_camera_info)
+        right_camera_info_msg = self.__caminfo_to_caminfomsg(right_camera_info)
 
         left_image_msg.header.stamp = current_time
         left_image_msg.header.frame_id = "stereo_camera"
@@ -139,7 +133,7 @@ class RosBridge:
 
     def process_cloud_map(self, cloud_map: PointCloud2):
         # Extract points from ROS PointCloud2 message
-        cloud_map.fields[3].datatype = 6
+        cloud_map.fields[3].datatype = 6  # type: ignore # pyright: ignore
         _points = pc2.read_points_list(
             cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
         )
@@ -163,7 +157,6 @@ class RosBridge:
             point_data.extend([x, y, z, r, g, b])
 
         points_array = np.array(point_data, dtype=np.float32)
-        self.extension.main_gl.set_points(points_array)
 
     def destroy(self):
         self.left_image_pub.unregister()
@@ -183,12 +176,26 @@ class RosBridge:
 
         return (disparity, self.bridge.imgmsg_to_cv2(disparity.image))
 
+    def convert_mat_to_img(
+        self,
+        inp: Optional[Tuple[DisparityImage, MatLike]],
+    ) -> Optional[MatLike]:
+        if inp is None:
+            return None
+
+        disparity, disp = inp
+        min = disparity.min_disparity
+        max = disparity.max_disparity
+
+        mapped = (np.clip(disp, min, max) - min) / (max - min) * 255
+        return mapped.astype(np.uint8)
+
     def inspect(
         self, absolute_x: float, absolute_y: float
     ) -> Tuple[float, float, float, float]:
         disparity = self.disparity_subject.value
         if disparity is None:
-            return (0, 0, 0, 0)
+            return (absolute_x, absolute_y, 0, 0)
 
         width = disparity.image.width
         height = disparity.image.height
@@ -206,17 +213,3 @@ class RosBridge:
             depth = 0
 
         return (float(x), float(y), float(d), float(depth))
-
-    def convert_mat_to_img(
-        self,
-        inp: Optional[Tuple[DisparityImage, MatLike]],
-    ) -> Optional[MatLike]:
-        if inp is None:
-            return None
-
-        disparity, disp = inp
-        min = disparity.min_disparity
-        max = disparity.max_disparity
-
-        mapped = (np.clip(disp, min, max) - min) / (max - min) * 255
-        return mapped.astype(np.uint8)

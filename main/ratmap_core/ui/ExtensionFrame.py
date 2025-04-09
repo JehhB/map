@@ -64,7 +64,6 @@ class ExtensionFrame(Frame):
 
     def _enable(self):
         try:
-            print(self._extension)
             self._extension.start()
         except Exception as e:
             traceback.print_exc()

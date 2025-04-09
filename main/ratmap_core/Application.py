@@ -1,3 +1,4 @@
+import traceback
 from typing import Optional
 
 from ratmap_common import AbstractEvent, EventTarget
@@ -50,6 +51,18 @@ class Application(EventTarget):
         self.__navigate_menu = self.__main_menu.navigate_menu
         self.__extension_menu = self.__main_menu.extension_menu
 
+        try:
+            self.__extension_manager.get("stereo_vslam").start()
+        except:
+            traceback.print_exc()
+
+    def close_window(self):
+        if self.__manage_extension_window is None:
+            return
+
+        self.__manage_extension_window.destroy()
+        self.__manage_extension_window = None
+
     def open_window(self, _event: AbstractEvent):
         if self.__manage_extension_window is not None:
             self.__manage_extension_window.lift()
@@ -60,14 +73,7 @@ class Application(EventTarget):
             self.__main_window,
         )
 
-        def on_close():
-            if self.__manage_extension_window is None:
-                return
-
-            self.__manage_extension_window.destroy()
-            self.__manage_extension_window = None
-
-        self.__manage_extension_window.protocol("WM_DELETE_WINDOW", on_close)
+        self.__manage_extension_window.protocol("WM_DELETE_WINDOW", self.close_window)
 
     def mainloop(self):
         self.__main_window.mainloop()

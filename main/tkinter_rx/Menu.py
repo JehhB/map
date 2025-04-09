@@ -13,6 +13,7 @@ from .typing import MenuKwargs
 class MenuEventDetail:
     origin: "Menu"
     path: Tuple[str, ...]
+    additional: Any = None
 
 
 class MenuEvent(AbstractEvent):
@@ -64,9 +65,8 @@ class Menu(tk.Menu):
         current_path = "activate"
         for sub_path in detail.path:
             current_path += "." + sub_path
-            self.__event_target.emit(
-                MenuEvent.factory(detail.origin, *detail.path, type=current_path)
-            )
+            event = MenuEvent(current_path, event.target, detail)
+            self.__event_target.emit(event)
 
     @property
     def event_target(self):

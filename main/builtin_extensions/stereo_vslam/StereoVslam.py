@@ -1,17 +1,60 @@
-from typing import TYPE_CHECKING, cast, final
+import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor
+from tkinter import messagebox
+from typing import TYPE_CHECKING, Optional, Tuple, Union, cast, final
 
+from cv2.typing import MatLike
+from PIL.Image import Image
+from reactivex import Observable, Subject, empty, operators
+from reactivex.subject import BehaviorSubject
 from typing_extensions import override
 
-from ratmap_common import AbstractExtension, ExtensionMetadata
+from ratmap_common import AbstractEvent, AbstractExtension, ExtensionMetadata
+from tkinter_rx.Menu import MenuEvent, MenuEventDetail
+
+from .Calibrator import Calibrator, CalibratorParams
+from .RosBridge import RosBridge
+from .ui import StereoVslamWindow
 
 if TYPE_CHECKING:
     from ratmap_core import Application
+
+
+class CalibratorParamsHolder:
+    chessboard_rows: BehaviorSubject[float]
+    chessboard_cols: BehaviorSubject[float]
+    square_size: BehaviorSubject[float]
+
+    def __init__(self) -> None:
+        self.chessboard_rows = BehaviorSubject(6)
+        self.chessboard_cols = BehaviorSubject(7)
+        self.square_size = BehaviorSubject(3)
+
+    def getParams(self) -> CalibratorParams:
+        return {
+            "square_size": self.square_size.value,
+            "chessboard_size": (
+                int(self.chessboard_cols.value),
+                int(self.chessboard_rows.value),
+            ),
+        }
 
 
 @final
 class StereoVslam(AbstractExtension):
     LABEL = "Stereo VSLAM"
     TARGET_FPS: float = 20.0
+
+    left_image_subject: Optional[Subject[Optional[Image]]]
+    right_image_subject: Optional[Subject[Optional[Image]]]
+
+    __extension_window: Optional[StereoVslamWindow]
+    __ros_bridge: Optional[RosBridge]
+    __calibrator: Optional[Calibrator]
+    __calibrator_params: CalibratorParamsHolder
+    __inspect_subject: Subject[Tuple[float, float, float, float]]
+
+    __calibration_executor: ThreadPoolExecutor
 
     @property
     @override
@@ -24,10 +67,55 @@ class StereoVslam(AbstractExtension):
 
     def __init__(self) -> None:
         super().__init__()
+        self.__extension_window = None
+        self.__ros_bridge = None
+        self.__calibrator = None
+        self.__calibration_executor = ThreadPoolExecutor(max_workers=1)
+
+        self.left_image_subject = None
+        self.right_image_subject = None
+
+        self.__calibrator_params = CalibratorParamsHolder()
+        self.__inspect_subject = Subject()
+
+        _ = self.add_event_listener(
+            "activate.stereo_vslam_menu.file.load_calibration",
+            self.__load_calibration_handler,
+        )
+
+        _ = self.add_event_listener(
+            "activate.stereo_vslam_menu.file.save_calibration",
+            self.__save_calibration_handler,
+        )
+
+        _ = self.add_event_listener(
+            "click.start_calibration", self.__start_calibration_handler
+        )
+
+        _ = self.add_event_listener(
+            "click.pause_calibration", self.__pause_calibration_handler
+        )
+
+        _ = self.add_event_listener(
+            "click.reset_calibration", self.__reset_calibration_handler
+        )
+
+        _ = self.add_event_listener(
+            "click.update_calibration", self.__update_calibration_handler
+        )
+
+        _ = self.add_event_listener("hover.disparity", self.__disparity_hover_handler)
 
     @override
     def start(self) -> None:
         application = cast("Application", self.context)
+
+        self.left_image_subject = Subject()
+        self.right_image_subject = Subject()
+
+        self.__ros_bridge = RosBridge()
+        self.__calibrator = Calibrator()
+
         application.extension_menu.add_command(
             label=StereoVslam.LABEL, command=self.__open_window
         )
@@ -38,11 +126,161 @@ class StereoVslam(AbstractExtension):
     def stop(self) -> None:
         super().stop()
 
+        if self.left_image_subject:
+            self.left_image_subject.dispose()
+            self.left_image_subject = None
+
+        if self.right_image_subject:
+            self.right_image_subject.dispose()
+            self.right_image_subject = None
+
+        if self.__ros_bridge:
+            self.__ros_bridge.destroy()
+            self.__ros_bridge = None
+
+        self.__calibrator = None
+
+        self.__close_window()
         application = cast("Application", self.context)
         _ = application.extension_menu.remove(label=StereoVslam.LABEL)
 
     def __close_window(self):
-        pass
+        if self.__extension_window is None:
+            return
+
+        self.__extension_window.destroy()
+        self.__extension_window = None
 
     def __open_window(self):
-        print("open_window")
+        if self.__ros_bridge is None or self.__calibrator is None:
+            return
+
+        application = cast("Application", self.context)
+        main_window = application.main_window
+
+        if self.__extension_window is not None:
+            self.__extension_window.lift()
+            return
+
+        self.__extension_window = StereoVslamWindow(main_window)
+        self.__extension_window.protocol("WM_DELETE_WINDOW", self.__close_window)
+
+        self.__extension_window.minimum_samples = (
+            self.__calibrator.MINIMUM_NUMBER_SAMPLE
+        )
+
+        def preview_image(
+            is_calibrating: bool,
+        ) -> Observable[Union[MatLike, Image, None]]:
+            if self.__ros_bridge is None or self.__calibrator is None:
+                return empty()
+            if is_calibrating:
+                return self.__calibrator.left_image_with_drawing
+            return self.__ros_bridge.disparity_image_observable
+
+        self.__extension_window.disparity_image_observable = (
+            self.__calibrator.is_calibrating.pipe(
+                operators.map(preview_image), operators.switch_latest()
+            )
+        )
+        self.__extension_window.left_image_observable = self.left_image_subject
+        self.__extension_window.right_image_observable = self.right_image_subject
+
+        self.__extension_window.is_calibrating_observable = (
+            self.__calibrator.is_calibrating
+        )
+
+        self.__extension_window.calibration_count_observable = (
+            self.__calibrator.number_of_samples
+        )
+
+        self.__extension_window.square_size_subject = (
+            self.__calibrator_params.square_size
+        )
+        self.__extension_window.chessboard_rows_subject = (
+            self.__calibrator_params.chessboard_rows
+        )
+        self.__extension_window.chessboard_cols_subject = (
+            self.__calibrator_params.chessboard_cols
+        )
+
+        self.__extension_window.inspect_observable = self.__inspect_subject
+
+        self.__extension_window.event_target.parent = self
+
+    def load_calibration(self, filename: str):
+        if self.__calibrator is None:
+            return False
+
+        return self.__calibrator.load(filename)
+
+    def save_calibration(self, filename: str):
+        if self.__calibrator is None:
+            return False
+
+        return self.__calibrator.save(filename)
+
+    def __load_calibration_handler(self, event: AbstractEvent):
+        if not isinstance(event, MenuEvent) or not isinstance(
+            event.detail, MenuEventDetail
+        ):
+            return
+
+        filename: str = event.detail.additional
+        _ = self.load_calibration(filename)
+
+    def __save_calibration_handler(self, event: AbstractEvent):
+        if not isinstance(event, MenuEvent) or not isinstance(
+            event.detail, MenuEventDetail
+        ):
+            return
+
+        filename: str = event.detail.additional
+        _ = self.save_calibration(filename)
+
+    def __start_calibration_handler(self, _event: AbstractEvent):
+        if self.__calibrator is None:
+            return
+
+        self.__calibrator.start(self.__calibrator_params.getParams())
+
+    def __pause_calibration_handler(self, _event: AbstractEvent):
+        if self.__calibrator is None:
+            return
+
+        self.__calibrator.pause()
+
+    def __reset_calibration_handler(self, _event: AbstractEvent):
+        if self.__calibrator is None:
+            return
+
+        self.__calibrator.reset()
+
+    def __update_calibration_handler(self, _event: AbstractEvent):
+        if self.__calibrator is None:
+            return
+
+        response = messagebox.askyesno(
+            "Update calibration",
+            "This would overwrite previous calibration information. Are you sure you want to proceed?",
+        )
+
+        if response:
+            _ = self.__calibration_executor.submit(self.__calibrator.update_calibration)
+
+    def __disparity_hover_handler(self, event: AbstractEvent):
+        if self.__calibrator is not None and self.__calibrator.is_calibrating.value:
+            return
+
+        if self.__ros_bridge is None:
+            return
+
+        detail = event.detail
+        if not isinstance(detail, tk.Event):
+            return
+
+        width = detail.widget.width
+        height = detail.widget.height
+
+        result = self.__ros_bridge.inspect(detail.x / width, detail.y / height)
+        self.__inspect_subject.on_next(result)

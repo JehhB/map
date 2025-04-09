@@ -66,6 +66,9 @@ class ExtensionManager(EventTarget):
     def items(self):
         return self.__extensions.items()
 
+    def get(self, key: str):
+        return self.__extensions[key]
+
     @override
     def dispose(self) -> None:
         for _k, x in self.__extensions.items():

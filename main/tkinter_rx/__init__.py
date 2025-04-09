@@ -18,7 +18,7 @@ from tkinter.ttk import (
 from .Button import Button, ButtonEvent
 from .Entry import Entry, EntryEvent
 from .ImageLabel import ImageLabel
-from .Label import Label
+from .Label import Label, LabelEvent
 from .Menu import Menu, MenuEvent, MenuEventDetail
 from .Scale import Scale, ScaleEvent
 from .ScrolledFrame import ScrolledFrame
@@ -35,6 +35,7 @@ __all__ = [
     "Frame",
     "ImageLabel",
     "Label",
+    "LabelEvent",
     "LabeledScale",
     "LabelFrame",
     "Menu",
