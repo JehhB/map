@@ -8,7 +8,6 @@ def main():
 
     app = Application()
     app.mainloop()
-    app.dispose()
 
 
 if __name__ == "__main__":

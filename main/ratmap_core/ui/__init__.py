@@ -1,5 +1,6 @@
 from .MainGl import MainGl
 from .MainWindow import MainWindow
+from .ManageExtensionsWindow import ManageExtensionsWindow
 from .MenuEdit import MenuEdit
 from .MenuExtension import MenuExtension
 from .MenuFile import MenuFile
@@ -14,4 +15,5 @@ __all__ = [
     "MenuFile",
     "MenuMain",
     "MenuNavigate",
+    "ManageExtensionsWindow",
 ]

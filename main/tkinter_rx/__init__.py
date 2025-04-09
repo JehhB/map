@@ -21,7 +21,9 @@ from .ImageLabel import ImageLabel
 from .Label import Label
 from .Menu import Menu, MenuEvent, MenuEventDetail
 from .Scale import Scale, ScaleEvent
+from .ScrolledFrame import ScrolledFrame
 from .Spinbox import Spinbox, SpinboxEvent
+from .WrappingLabel import WrappingLabel
 
 __all__ = [
     "Button",
@@ -46,9 +48,11 @@ __all__ = [
     "Scale",
     "ScaleEvent",
     "Scrollbar",
+    "ScrolledFrame",
     "Separator",
     "Sizegrip",
     "Spinbox",
     "SpinboxEvent",
     "Treeview",
+    "WrappingLabel",
 ]

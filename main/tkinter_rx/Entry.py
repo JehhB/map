@@ -43,22 +43,21 @@ class Entry(ttk.Entry):
         self.__text_write_cbn = None
 
         text_variable = kwargs.pop("textvariable", None)
+        text_subject = kwargs.pop("textsubject", None)
+        state_observable = kwargs.pop("stateobservable", None)
+
+        super().__init__(master, **cast(BaseEntryKwargs, kwargs))
+
         if text_variable is None:
             text_variable = tk.StringVar(self)
         self.__text_variable = text_variable
+        _ = self.configure(textvariable=text_variable)
 
-        text_subject = kwargs.pop("textsubject", None)
         if text_subject is None:
             text_subject = cast(Subject[str], Subject())
-
-        state_observable = kwargs.pop("stateobservable", None)
-
-        super().__init__(
-            master, **cast(BaseEntryKwargs, kwargs), textvariable=text_variable
-        )
+        self.text_subject = text_subject
 
         self.state_observable = state_observable
-        self.text_subject = text_subject
 
         self.__event_target = EventTarget()
 

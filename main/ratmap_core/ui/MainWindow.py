@@ -39,3 +39,7 @@ class MainWindow(tk.Tk):
     def destroy(self) -> None:
         self.__event_target.dispose()
         return super().destroy()
+
+    @property
+    def main_gl(self):
+        return self.__main_gl

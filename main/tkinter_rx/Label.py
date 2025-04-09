@@ -27,14 +27,15 @@ class Label(ttk.Label):
         self.__text_disposer = None
 
         variable = kwargs.pop("textvariable", None)
+        text_observable = kwargs.pop("textobservable", None)
+
+        super().__init__(master, **cast(BaseLabelKwargs, kwargs))
+
         if variable is None:
             text = None if "text" not in kwargs else str(kwargs.pop("text"))
             variable = tk.StringVar(self, text)
         self.__text_variable = variable
-
-        text_observable = kwargs.pop("textobservable", None)
-
-        super().__init__(master, **cast(BaseLabelKwargs, kwargs), textvariable=variable)
+        _ = self.configure(textvariable=variable)
 
         self.__text_observable = None
         self.text_observable = text_observable

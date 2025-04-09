@@ -38,16 +38,15 @@ class Spinbox(ttk.Spinbox):
         kwargs = kwargs.copy()
 
         variable = kwargs.pop("textvariable", None)
-        if variable is None:
-            variable = tk.DoubleVar(self)
-        self.__text_variable = variable
-
         value_subject = kwargs.pop("value_subject", None)
         state_observable = kwargs.pop("state_observable", None)
 
-        super().__init__(
-            master, **cast(BaseSpinboxKwargs, kwargs), textvariable=variable
-        )
+        super().__init__(master, **cast(BaseSpinboxKwargs, kwargs))
+
+        if variable is None:
+            variable = tk.DoubleVar(self)
+        self.__text_variable = variable
+        _ = self.configure(textvariable=variable)
 
         self.__value_disposer = None
         self.__value_write_cbn = None

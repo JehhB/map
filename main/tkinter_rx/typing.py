@@ -250,6 +250,19 @@ class MenuKwargs(SubMenuKwargs, total=False):
     tearoff: Union[bool, Literal[0, 1]]
 
 
+class FrameKwargs(TypedDict, total=False):
+    border: ScreenUnits
+    borderwidth: ScreenUnits
+    class_: str
+    cursor: Cursor
+    height: ScreenUnits
+    name: str
+    relief: Relief
+    style: str
+    takefocus: TakeFocusValue
+    width: ScreenUnits
+
+
 __all__ = [
     "Anchor",
     "BaseButtonKwargs",
@@ -278,4 +291,5 @@ __all__ = [
     "TakeFocusValue",
     "TtkCompound",
     "XYScrollCommand",
+    "FrameKwargs",
 ]

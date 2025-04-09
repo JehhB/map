@@ -1,0 +1,3 @@
+stereo_vslam:
+  module: "stereo_vslam"
+  instance: "stereo_vslam"

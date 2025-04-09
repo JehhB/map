@@ -38,11 +38,6 @@ class Button(ttk.Button):
         self.__state_disposer = None
 
         variable = kwargs.pop("textvariable", None)
-        if variable is None:
-            text = None if "text" not in kwargs else str(kwargs.pop("text"))
-            variable = tk.StringVar(self, text)
-        self.__text_variable = variable
-
         text_observable = kwargs.pop("textobservable", None)
         state_observable = kwargs.pop("stateobservable", None)
 
@@ -50,8 +45,13 @@ class Button(ttk.Button):
             master,
             **cast(BaseButtonKwargs, kwargs),
             command=self.__on_click_handler,
-            textvariable=variable
         )
+
+        if variable is None:
+            text = None if "text" not in kwargs else str(kwargs.pop("text"))
+            variable = tk.StringVar(self, text)
+        self.__text_variable = variable
+        _ = self.configure(textvariable=variable)
 
         self.__text_observable = None
         self.__state_observable = None

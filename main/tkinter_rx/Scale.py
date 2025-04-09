@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import DoubleVar, ttk
+from tkinter import DoubleVar, Variable, ttk
 from typing import Literal, Optional, cast
 
 from reactivex import Observable, Subject, operators
@@ -35,15 +35,16 @@ class Scale(ttk.Scale):
         kwargs = kwargs.copy()
 
         variable = kwargs.pop("variable", None)
+        value_subject = kwargs.pop("value_subject", None)
+        state_observable = kwargs.pop("state_observable", None)
+
+        super().__init__(master, **cast(BaseScaleKwargs, kwargs))
+
         if variable is None:
             value = kwargs.pop("value", 0.0)
             variable = DoubleVar(self, value)
         self.__variable = variable
-
-        value_subject = kwargs.pop("value_subject", None)
-        state_observable = kwargs.pop("state_observable", None)
-
-        super().__init__(master, **cast(BaseScaleKwargs, kwargs), variable=variable)
+        _ = self.configure(variable=variable)
 
         self.__value_disposer = None
         self.__value_write_cbn = None

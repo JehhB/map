@@ -19,10 +19,24 @@ class ExtensionEvent(AbstractEvent):
 
 class AbstractExtension(EventTarget, ABC):
     __started: BehaviorSubject[bool]
+    __context: object
 
     def __init__(self) -> None:
         super().__init__()
         self.__started = BehaviorSubject(False)
+        self.__context = None
+
+    @property
+    def context(self):
+        return self.__context
+
+    @context.setter
+    def context(self, context: object):
+        self.__context = context
+
+    @context.deleter
+    def context(self):
+        self.__context = None
 
     @property
     @abstractmethod
