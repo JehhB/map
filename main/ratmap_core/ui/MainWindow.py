@@ -43,3 +43,7 @@ class MainWindow(tk.Tk):
     @property
     def main_gl(self):
         return self.__main_gl
+
+    @property
+    def main_menu(self):
+        return self.__main_menu

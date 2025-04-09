@@ -55,6 +55,7 @@ class ExtensionManager(EventTarget):
             module_ = import_module(module)
             extension: AbstractExtension = getattr(module_, instance)
             extension.context = self.__context
+            extension.parent = self
 
             self.__extensions[key] = extension
         except Exception as e:

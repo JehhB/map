@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TypedDict
 
 from reactivex import Observable
@@ -9,12 +10,19 @@ from .EventTarget import EventTarget
 
 
 class ExtensionMetadata(TypedDict):
+    id: str
     title: str
     description: str
 
 
+@dataclass
+class ExtensionEventDetail:
+    id: str
+
+
 class ExtensionEvent(AbstractEvent):
-    pass
+    def __init__(self, id: str, type: str, target: object = None):
+        super().__init__(type, target, ExtensionEventDetail(id))
 
 
 class AbstractExtension(EventTarget, ABC):
@@ -44,12 +52,16 @@ class AbstractExtension(EventTarget, ABC):
         raise NotImplementedError()
 
     def start(self) -> None:
+        id = self.metadata["id"]
         self.__started.on_next(True)
-        self.emit(ExtensionEvent("start"))
+        self.emit(ExtensionEvent(id, "start"))
+        self.emit(ExtensionEvent(id, "start." + id))
 
     def stop(self) -> None:
+        id = self.metadata["id"]
         self.__started.on_next(False)
-        self.emit(ExtensionEvent("end"))
+        self.emit(ExtensionEvent(id, "end"))
+        self.emit(ExtensionEvent(id, "end." + id))
 
     @property
     def is_started(self) -> bool:

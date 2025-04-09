@@ -2,12 +2,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List
 
-from reactivex.subject import BehaviorSubject
-
 from app.Container import SetterInjectable
 from app.EventEmiter import EventEmitter
 from app.events.DeinitEvent import DeinitEvent
 from app.events.InitEvent import InitEvent
+from reactivex.subject import BehaviorSubject
 
 
 @dataclass

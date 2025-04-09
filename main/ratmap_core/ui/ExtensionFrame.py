@@ -1,4 +1,5 @@
 import tkinter as tk
+import traceback
 from tkinter import font, messagebox
 from typing import Optional, Set, final
 
@@ -63,14 +64,17 @@ class ExtensionFrame(Frame):
 
     def _enable(self):
         try:
+            print(self._extension)
             self._extension.start()
         except Exception as e:
+            traceback.print_exc()
             _ = messagebox.showerror("Error starting extension", str(e))
 
     def _disable(self):
         try:
             self._extension.stop()
         except Exception as e:
+            traceback.print_exc()
             _ = messagebox.showerror("Error terminating extension", str(e))
 
     @override
