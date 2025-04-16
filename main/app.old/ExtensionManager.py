@@ -1,7 +1,5 @@
 from typing import Dict, Type, TypeVar
 
-from typing_extensions import Self, override
-
 from app.AbstractExtension import AbstractExtension
 from app.Container import (
     AbstractModule,
@@ -10,6 +8,7 @@ from app.Container import (
     ModuleFactory,
     SetterInjectable,
 )
+from typing_extensions import Self, override
 
 AbstractExtensionImpl = TypeVar("AbstractExtensionImpl", bound="AbstractExtension")
 

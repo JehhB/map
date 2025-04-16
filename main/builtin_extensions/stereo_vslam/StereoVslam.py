@@ -1,7 +1,7 @@
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
 from tkinter import messagebox
-from typing import TYPE_CHECKING, Optional, Tuple, Union, cast, final
+from typing import Optional, Tuple, Union, final
 
 from cv2.typing import MatLike
 from PIL.Image import Image
@@ -9,16 +9,15 @@ from reactivex import Observable, Subject, empty, operators
 from reactivex.subject import BehaviorSubject
 from typing_extensions import override
 
-from ratmap_common import AbstractEvent, AbstractExtension, ExtensionMetadata
+from ratmap_common import AbstractEvent, ExtensionMetadata
+from ratmap_core import BaseExtension
 from tkinter_rx import MenuEvent
+from tkinter_rx.Label import LabelEvent
 from tkinter_rx.TkinterEvent import TkinterEventDetail
 
 from .Calibrator import Calibrator, CalibratorParams
 from .RosBridge import RosBridge
 from .ui import StereoVslamWindow
-
-if TYPE_CHECKING:
-    from ratmap_core import Application
 
 
 class CalibratorParamsHolder:
@@ -42,7 +41,7 @@ class CalibratorParamsHolder:
 
 
 @final
-class StereoVslam(AbstractExtension):
+class StereoVslam(BaseExtension):
     LABEL = "Stereo VSLAM"
     TARGET_FPS: float = 20.0
 
@@ -109,15 +108,13 @@ class StereoVslam(AbstractExtension):
 
     @override
     def start(self) -> None:
-        application = cast("Application", self.context)
-
         self.left_image_subject = Subject()
         self.right_image_subject = Subject()
 
         self.__ros_bridge = RosBridge()
         self.__calibrator = Calibrator()
 
-        application.extension_menu.add_command(
+        self.context.extension_menu.add_command(
             label=StereoVslam.LABEL, command=self.__open_window
         )
 
@@ -142,8 +139,7 @@ class StereoVslam(AbstractExtension):
         self.__calibrator = None
 
         self.__close_window()
-        application = cast("Application", self.context)
-        _ = application.extension_menu.remove(label=StereoVslam.LABEL)
+        _ = self.context.extension_menu.remove(label=StereoVslam.LABEL)
 
     def __close_window(self):
         if self.__extension_window is None:
@@ -156,8 +152,7 @@ class StereoVslam(AbstractExtension):
         if self.__ros_bridge is None or self.__calibrator is None:
             return
 
-        application = cast("Application", self.context)
-        main_window = application.main_window
+        main_window = self.context.main_window
 
         if self.__extension_window is not None:
             self.__extension_window.lift()
@@ -277,7 +272,11 @@ class StereoVslam(AbstractExtension):
         if self.__ros_bridge is None:
             return
 
+        if not isinstance(event, LabelEvent):
+            return
+
         detail = event.detail
+
         if not isinstance(detail, tk.Event):
             return
 

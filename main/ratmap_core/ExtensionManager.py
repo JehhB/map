@@ -2,22 +2,26 @@ import os
 import sys
 from glob import glob
 from importlib import import_module
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 
 import yaml
 from typing_extensions import override
 
-from ratmap_common import AbstractExtension, EventTarget
+from ratmap_common import EventTarget
 
 CURRENT_DIR = os.path.realpath(os.path.dirname(__file__))
 BUILTIN_EXTENSIONS_FOLDER = os.path.join(CURRENT_DIR, "..", "builtin_extensions")
 
+if TYPE_CHECKING:
+    from .Application import Application
+    from .BaseExtension import BaseExtension
+
 
 class ExtensionManager(EventTarget):
-    __extensions: Dict[str, AbstractExtension]
-    __context: object
+    __extensions: "Dict[str, BaseExtension]"
+    __context: "Application"
 
-    def __init__(self, context: object = None) -> None:
+    def __init__(self, context: "Application") -> None:
         super().__init__()
         self.__context = context
         self.__extensions = dict()
@@ -53,8 +57,10 @@ class ExtensionManager(EventTarget):
                 sys.path.append(base_path)
 
             module_ = import_module(module)
-            extension: AbstractExtension = getattr(module_, instance)
+            extension: "BaseExtension" = getattr(module_, instance)
             extension.context = self.__context
+            extension.extension_manager = self
+
             extension.parent = self
 
             self.__extensions[key] = extension
@@ -67,7 +73,10 @@ class ExtensionManager(EventTarget):
         return self.__extensions.items()
 
     def get(self, key: str):
-        return self.__extensions[key]
+        if key in self.__extensions:
+            return self.__extensions[key]
+        else:
+            raise RuntimeError(f'Extension with id "{key}" is missing')
 
     @override
     def dispose(self) -> None:

@@ -44,6 +44,13 @@ class ExtensionFrame(Frame):
 
         header.pack(fill=tk.X, expand=tk.YES, pady=4)
 
+        if "dependency" in metadata:
+            WrappingLabel(
+                self,
+                text="Dependencies: " + ", ".join(metadata["dependency"]),
+                justify=tk.LEFT,
+            ).pack(side=tk.TOP, fill=tk.X, expand=tk.YES, pady=4)
+
         WrappingLabel(self, text=metadata["description"], justify=tk.LEFT).pack(
             side=tk.TOP, fill=tk.X, expand=tk.YES, pady=4
         )

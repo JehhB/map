@@ -25,14 +25,14 @@ class TkinterEventDetail(
 _sentinel = TkinterEventDetail()
 
 
-class TkinterEvent(BaseEvent):
-    detail: Union[tk.Event[tk.Misc], Exception, None]
+class TkinterEvent(BaseEvent, Generic[_T]):
+    detail: Union[tk.Event[_T], Exception, None]
 
     def __init__(
         self,
         type: str,
-        target: Optional[tk.Misc] = None,
-        detail: Union[tk.Event[tk.Misc], Exception, None] = _sentinel,
+        target: Optional[_T] = None,
+        detail: Union[tk.Event[_T], Exception, None] = _sentinel,
     ):
         if detail is _sentinel:
             detail = TkinterEventDetail()
