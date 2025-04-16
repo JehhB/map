@@ -17,7 +17,8 @@ class CategorizedSubject(Subject[Tuple[str, _T]]):
 
     def listen(self, category: str, callback: Callable[[_T], None]) -> DisposableBase:
         disposer = self.pipe(
-            ops.filter(lambda pair: pair[0] == category), ops.map(lambda pair: pair[1])
+            ops.filter(lambda pair: pair[0].startswith(category)),
+            ops.map(lambda pair: pair[1]),
         ).subscribe(on_next=callback)
         self.__disposers.append(disposer)
         return disposer

@@ -5,7 +5,7 @@ from typing import TypedDict
 from reactivex import Observable
 from reactivex.subject import BehaviorSubject
 
-from .AbstractEvent import AbstractEvent
+from .BaseEvent import BaseEvent
 from .EventTarget import EventTarget
 
 
@@ -20,7 +20,7 @@ class ExtensionEventDetail:
     id: str
 
 
-class ExtensionEvent(AbstractEvent):
+class ExtensionEvent(BaseEvent):
     def __init__(self, id: str, type: str, target: object = None):
         super().__init__(type, target, ExtensionEventDetail(id))
 
@@ -54,13 +54,11 @@ class AbstractExtension(EventTarget, ABC):
     def start(self) -> None:
         id = self.metadata["id"]
         self.__started.on_next(True)
-        self.emit(ExtensionEvent(id, "start"))
         self.emit(ExtensionEvent(id, "start." + id))
 
     def stop(self) -> None:
         id = self.metadata["id"]
         self.__started.on_next(False)
-        self.emit(ExtensionEvent(id, "end"))
         self.emit(ExtensionEvent(id, "end." + id))
 
     @property

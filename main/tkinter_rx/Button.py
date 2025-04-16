@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Literal, cast
@@ -6,13 +8,14 @@ from reactivex import Observable, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import Optional, Unpack, override
 
-from ratmap_common import AbstractEvent, EventTarget
+from ratmap_common import EventTarget
+from tkinter_rx.TkinterEvent import TkinterEvent
 
 from .typing import BaseButtonKwargs, ButtonKwargs
 from .util import safe_callback, sync_observable_to_variable
 
 
-class ButtonEvent(AbstractEvent):
+class ButtonEvent(TkinterEvent):
     pass
 
 
@@ -67,6 +70,11 @@ class Button(ttk.Button):
     def __on_click_handler(self):
         if self.__command:
             self.__command()
+
+        event: tk.Event["Button"] = tk.Event()
+        event.widget = self
+        event.type = tk.EventType.VirtualEvent
+
         self.__event_target.emit(ButtonEvent("click"))
 
     @property

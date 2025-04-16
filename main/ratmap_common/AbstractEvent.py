@@ -1,5 +1,7 @@
 from abc import ABC
-from typing import Any, Callable
+from typing import Any
+
+from typing_extensions import override
 
 
 class AbstractEvent(ABC):
@@ -7,11 +9,11 @@ class AbstractEvent(ABC):
     target: object
     detail: Any
 
-    stop_propagation: Callable[[], None]
-
     def __init__(self, type: str, target: object = None, detail: Any = None):
         self.type = type
         self.target = target
         self.detail = detail if detail is not None else {}
 
-        self.stop_propagation = lambda: None
+    @override
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} target={repr(self.target)}>"

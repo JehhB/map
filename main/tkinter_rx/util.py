@@ -56,7 +56,7 @@ def sync_observable_to_variable(
         if x != var.get():
             var.set(x)  # type: ignore # pyright: ignore[reportArgumentType]
 
-    return observable.pipe(operators.debounce(0.1)).subscribe(
+    return observable.pipe(operators.throttle_first(0.1)).subscribe(
         safe_callback(master, update)
     )
 

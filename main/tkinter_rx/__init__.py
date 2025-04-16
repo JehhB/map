@@ -19,10 +19,11 @@ from .Button import Button, ButtonEvent
 from .Entry import Entry, EntryEvent
 from .ImageLabel import ImageLabel
 from .Label import Label, LabelEvent
-from .Menu import Menu, MenuEvent, MenuEventDetail
+from .Menu import Menu, MenuEvent
 from .Scale import Scale, ScaleEvent
 from .ScrolledFrame import ScrolledFrame
 from .Spinbox import Spinbox, SpinboxEvent
+from .TkinterEvent import TkinterEvent, TkinterEventDetail
 from .WrappingLabel import WrappingLabel
 
 __all__ = [
@@ -40,7 +41,6 @@ __all__ = [
     "LabelFrame",
     "Menu",
     "MenuEvent",
-    "MenuEventDetail",
     "Menubutton",
     "Notebook",
     "PanedWindow",
@@ -54,6 +54,8 @@ __all__ = [
     "Sizegrip",
     "Spinbox",
     "SpinboxEvent",
+    "TkinterEvent",
+    "TkinterEventDetail",
     "Treeview",
     "WrappingLabel",
 ]

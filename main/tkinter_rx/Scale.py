@@ -1,18 +1,21 @@
+from __future__ import annotations
+
 import tkinter as tk
-from tkinter import DoubleVar, Variable, ttk
+from tkinter import DoubleVar, ttk
 from typing import Literal, Optional, cast
 
 from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import Unpack, override
 
-from ratmap_common import AbstractEvent, EventTarget
+from ratmap_common import EventTarget
 
+from .TkinterEvent import TkinterEvent, TkinterEventDetail
 from .typing import BaseScaleKwargs, ScaleKwargs
 from .util import bind_subject_to_variable, safe_callback
 
 
-class ScaleEvent(AbstractEvent):
+class ScaleEvent(TkinterEvent):
     pass
 
 
@@ -76,8 +79,7 @@ class Scale(ttk.Scale):
             return
 
         def on_change_callback(new_val: float):
-            event = ScaleEvent("on_change")
-            event.detail = new_val
+            event = ScaleEvent("on_change", detail=TkinterEventDetail(new_val))
             self.__event_target.emit(event)
 
         (self.__value_disposer, self.__value_write_cbn) = bind_subject_to_variable(

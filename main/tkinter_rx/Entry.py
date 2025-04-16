@@ -6,13 +6,14 @@ from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
 from typing_extensions import Unpack, override
 
-from ratmap_common import AbstractEvent, EventTarget
+from ratmap_common import EventTarget
+from tkinter_rx.TkinterEvent import TkinterEvent
 
 from .typing import BaseEntryKwargs, EntryKwargs
 from .util import bind_subject_to_variable, safe_callback
 
 
-class EntryEvent(AbstractEvent):
+class EntryEvent(TkinterEvent):
     pass
 
 
@@ -62,10 +63,12 @@ class Entry(ttk.Entry):
         self.__event_target = EventTarget()
 
         self.__focus_cbn = self.bind(
-            "<FocusIn>", lambda _: self.__event_target.emit(EntryEvent("focus"), self)
+            "<FocusIn>",
+            lambda e: self.__event_target.emit(EntryEvent("focus", detail=e), self),
         )
         self.__blur_cbn = self.bind(
-            "<FocusOut>", lambda _: self.__event_target.emit(EntryEvent("blur"), self)
+            "<FocusOut>",
+            lambda e: self.__event_target.emit(EntryEvent("blur", detail=e), self),
         )
 
     @property

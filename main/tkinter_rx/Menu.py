@@ -1,28 +1,22 @@
 import tkinter as tk
-from dataclasses import dataclass
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional
 
 from typing_extensions import Unpack, override
 
-from ratmap_common import AbstractEvent, EventTarget
+from ratmap_common import EventTarget
 
+from .TkinterEvent import TkinterEvent, TkinterEventDetail
 from .typing import MenuKwargs
 
 
-@dataclass
-class MenuEventDetail:
-    origin: "Menu"
-    path: Tuple[str, ...]
-    additional: Any = None
-
-
-class MenuEvent(AbstractEvent):
-    detail: Union[MenuEventDetail, Any]
-
+class MenuEvent(TkinterEvent):
     @staticmethod
-    def factory(menu: "Menu", *path: str, type: str = "activate"):
-        event = MenuEvent(type)
-        event.detail = MenuEventDetail(origin=menu, path=path)
+    def factory(
+        menu: "Menu", *path: str, type: str = "activate", additional: Any = None
+    ):
+        type = ".".join([type, *path])
+        detail = TkinterEventDetail(additional)
+        event = MenuEvent(type, menu, detail)
         return event
 
 
@@ -51,22 +45,8 @@ class Menu(tk.Menu):
                 pass
         return False
 
-    def emit(self, event: AbstractEvent):
+    def emit(self, event: MenuEvent):
         self.__event_target.emit(event)
-
-        if (
-            event.type != "activate"
-            or not isinstance(event, MenuEvent)
-            or not isinstance(event.detail, MenuEventDetail)
-        ):
-            return
-
-        detail = event.detail
-        current_path = "activate"
-        for sub_path in detail.path:
-            current_path += "." + sub_path
-            event = MenuEvent(current_path, event.target, detail)
-            self.__event_target.emit(event)
 
     @property
     def event_target(self):

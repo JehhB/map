@@ -10,7 +10,8 @@ from reactivex.subject import BehaviorSubject
 from typing_extensions import override
 
 from ratmap_common import AbstractEvent, AbstractExtension, ExtensionMetadata
-from tkinter_rx.Menu import MenuEvent, MenuEventDetail
+from tkinter_rx import MenuEvent
+from tkinter_rx.TkinterEvent import TkinterEventDetail
 
 from .Calibrator import Calibrator, CalibratorParams
 from .RosBridge import RosBridge
@@ -222,16 +223,17 @@ class StereoVslam(AbstractExtension):
 
     def __load_calibration_handler(self, event: AbstractEvent):
         if not isinstance(event, MenuEvent) or not isinstance(
-            event.detail, MenuEventDetail
+            event.detail, TkinterEventDetail
         ):
             return
 
         filename: str = event.detail.additional
+        print(filename)
         _ = self.load_calibration(filename)
 
     def __save_calibration_handler(self, event: AbstractEvent):
         if not isinstance(event, MenuEvent) or not isinstance(
-            event.detail, MenuEventDetail
+            event.detail, TkinterEventDetail
         ):
             return
 

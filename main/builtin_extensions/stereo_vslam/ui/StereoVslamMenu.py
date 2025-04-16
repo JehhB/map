@@ -38,9 +38,12 @@ class StereoVslamMenu(Menu):
             return
 
         event = MenuEvent.factory(
-            self.__file_menu, "stereo_vslam_menu", "file", "load_calibration"
+            self.__file_menu,
+            "stereo_vslam_menu",
+            "file",
+            "load_calibration",
+            additional=filename,
         )
-        event.detail.additional = filename
         self.emit(event)
 
     def __save_calibration(self):
@@ -54,7 +57,10 @@ class StereoVslamMenu(Menu):
             return
 
         event = MenuEvent.factory(
-            self.__file_menu, "stereo_vslam_menu", "file", "save_calibration"
+            self.__file_menu,
+            "stereo_vslam_menu",
+            "file",
+            "save_calibration",
+            additional=filename,
         )
-        event.detail.additional = filename
         self.emit(event)

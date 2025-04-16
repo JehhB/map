@@ -1,3 +1,7 @@
 stereo_vslam:
   module: "stereo_vslam"
   instance: "stereo_vslam"
+
+  #euroc_mav_loader:
+  #module: "euroc_mav_loader"
+  #instance: "euroc_mav_loader"

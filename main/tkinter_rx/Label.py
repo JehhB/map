@@ -6,13 +6,14 @@ from reactivex import Observable
 from reactivex.abc import DisposableBase
 from typing_extensions import Optional, Unpack, override
 
-from ratmap_common import AbstractEvent, EventTarget
+from ratmap_common import EventTarget
 
+from .TkinterEvent import TkinterEvent
 from .typing import BaseLabelKwargs, LabelKwargs
 from .util import sync_observable_to_variable
 
 
-class LabelEvent(AbstractEvent):
+class LabelEvent(TkinterEvent):
     pass
 
 

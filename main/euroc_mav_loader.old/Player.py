@@ -5,19 +5,20 @@ import time
 from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from typing import Generic, Iterator, Literal, Optional, TypeVar
 
+from app.EventEmiter import EventEmitter
+from app.events.AbstractEvent import AbstractEvent
 from reactivex.scheduler import ThreadPoolScheduler
 from reactivex.subject import BehaviorSubject, Subject
 from typing_extensions import TypeAlias
 
-from app.EventEmiter import EventEmitter
-from app.events.AbstractEvent import AbstractEvent
+from ratmap_common.BaseEvent import BaseEvent
 
 T = TypeVar("T")
 
 PlayerState: TypeAlias = Literal["playing", "idle", "paused", "completed"]
 
 
-class PlayerEvent(AbstractEvent):
+class PlayerEvent(BaseEvent):
     state: PlayerState
 
     def __init__(self, state: PlayerState) -> None:
