@@ -15,9 +15,15 @@ class MenuEvent(TkinterEvent):
         menu: "Menu", *path: str, type: str = "activate", additional: Any = None
     ):
         type = ".".join([type, *path])
-        detail = TkinterEventDetail(additional)
+        detail = TkinterEventDetail(menu, additional)
         event = MenuEvent(type, menu, detail)
         return event
+
+    @staticmethod
+    def emit_factory(
+        menu: "Menu", *path: str, type: str = "Activate", additional: Any = None
+    ):
+        menu.emit(MenuEvent.factory(menu, *path, type=type, additional=additional))
 
 
 class Menu(tk.Menu):

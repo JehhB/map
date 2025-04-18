@@ -28,7 +28,14 @@ class Scale(ttk.Scale):
     __value_disposer: Optional[DisposableBase]
     __value_write_cbn: Optional[str]
 
+    __focus_cbn: str
+    __blur_cbn: str
+
     __event_target: EventTarget
+
+    __change_event: str
+    __focus_event: str
+    __blur_event: str
 
     def __init__(
         self,
@@ -38,8 +45,11 @@ class Scale(ttk.Scale):
         kwargs = kwargs.copy()
 
         variable = kwargs.pop("variable", None)
-        value_subject = kwargs.pop("value_subject", None)
-        state_observable = kwargs.pop("state_observable", None)
+        value_subject = kwargs.pop("valuesubject", None)
+        state_observable = kwargs.pop("stateobservable", None)
+        self.__change_event = kwargs.pop("changeevent", "change")
+        self.__focus_event = kwargs.pop("focusevent", "focus")
+        self.__blur_event = kwargs.pop("blurevent", "blur")
 
         super().__init__(master, **cast(BaseScaleKwargs, kwargs))
 
@@ -61,6 +71,19 @@ class Scale(ttk.Scale):
 
         self.__event_target = EventTarget()
 
+        self.__focus_cbn = self.bind(
+            "<FocusIn>",
+            lambda e: self.__event_target.emit(
+                ScaleEvent(self.__focus_event, detail=e), self
+            ),
+        )
+        self.__blur_cbn = self.bind(
+            "<FocusOut>",
+            lambda e: self.__event_target.emit(
+                ScaleEvent(self.__blur_event, detail=e), self
+            ),
+        )
+
     @property
     def event_target(self):
         return self.__event_target
@@ -79,7 +102,9 @@ class Scale(ttk.Scale):
             return
 
         def on_change_callback(new_val: float):
-            event = ScaleEvent("on_change", detail=TkinterEventDetail(new_val))
+            event = ScaleEvent(
+                self.__change_event, detail=TkinterEventDetail(self, new_val)
+            )
             self.__event_target.emit(event)
 
         (self.__value_disposer, self.__value_write_cbn) = bind_subject_to_variable(
@@ -135,6 +160,9 @@ class Scale(ttk.Scale):
     def destroy(self) -> None:
         del self.value_subject
         del self.state_observable
+
+        self.unbind("<FocusIn>", self.__focus_cbn)
+        self.unbind("<FocusOut>", self.__blur_cbn)
 
         self.__event_target.dispose()
         return super().destroy()

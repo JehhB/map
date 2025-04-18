@@ -7,8 +7,8 @@ from reactivex.abc import DisposableBase
 from typing_extensions import Unpack, override
 
 from ratmap_common import EventTarget
-from tkinter_rx.TkinterEvent import TkinterEvent
 
+from .TkinterEvent import TkinterEvent, TkinterEventDetail
 from .typing import BaseEntryKwargs, EntryKwargs
 from .util import bind_subject_to_variable, safe_callback
 
@@ -31,6 +31,10 @@ class Entry(ttk.Entry):
 
     __event_target: EventTarget
 
+    __change_event: str
+    __focus_event: str
+    __blur_event: str
+
     def __init__(
         self, master: Optional[tk.Misc] = None, **kwargs: Unpack[EntryKwargs]
     ) -> None:
@@ -46,6 +50,10 @@ class Entry(ttk.Entry):
         text_variable = kwargs.pop("textvariable", None)
         text_subject = kwargs.pop("textsubject", None)
         state_observable = kwargs.pop("stateobservable", None)
+
+        self.__change_event = kwargs.pop("changeevent", "change")
+        self.__focus_event = kwargs.pop("focusevent", "focus")
+        self.__blur_event = kwargs.pop("blurevent", "blur")
 
         super().__init__(master, **cast(BaseEntryKwargs, kwargs))
 
@@ -64,11 +72,15 @@ class Entry(ttk.Entry):
 
         self.__focus_cbn = self.bind(
             "<FocusIn>",
-            lambda e: self.__event_target.emit(EntryEvent("focus", detail=e), self),
+            lambda e: self.__event_target.emit(
+                EntryEvent(self.__focus_event, detail=e), self
+            ),
         )
         self.__blur_cbn = self.bind(
             "<FocusOut>",
-            lambda e: self.__event_target.emit(EntryEvent("blur", detail=e), self),
+            lambda e: self.__event_target.emit(
+                EntryEvent(self.__blur_event, detail=e), self
+            ),
         )
 
     @property
@@ -122,8 +134,9 @@ class Entry(ttk.Entry):
             return
 
         def on_change_callback(new_val: str):
-            event = EntryEvent("on_change")
-            event.detail = new_val
+            event = EntryEvent(
+                self.__change_event, detail=TkinterEventDetail(self, new_val)
+            )
             self.__event_target.emit(event)
 
         (self.__text_disposer, self.__text_write_cbn) = bind_subject_to_variable(
@@ -150,4 +163,5 @@ class Entry(ttk.Entry):
         self.unbind("<FocusIn>", self.__focus_cbn)
         self.unbind("<FocusOut>", self.__blur_cbn)
 
+        self.event_target.dispose()
         return super().destroy()

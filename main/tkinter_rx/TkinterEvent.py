@@ -16,9 +16,11 @@ class TkinterEventDetail(
     additional: Any
     widget: _T
 
-    def __init__(self, additional: Any = None) -> None:
+    def __init__(self, widget: Optional[_T] = None, additional: Any = None) -> None:
         super().__init__()
         self.type = tk.EventType.VirtualEvent
+        if widget is not None:
+            self.widget = widget
         self.additional = additional
 
 

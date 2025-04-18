@@ -3,9 +3,8 @@ from typing import Optional
 
 from typing_extensions import Unpack, override
 
-from tkinter_rx.typing import LabelKwargs
-
 from .Label import Label
+from .typing import LabelKwargs
 
 
 class WrappingLabel(Label):

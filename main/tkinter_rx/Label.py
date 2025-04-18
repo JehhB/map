@@ -13,7 +13,7 @@ from .typing import BaseLabelKwargs, LabelKwargs
 from .util import sync_observable_to_variable
 
 
-class LabelEvent(TkinterEvent["Label"]):
+class LabelEvent(TkinterEvent[tk.Label]):
     pass
 
 

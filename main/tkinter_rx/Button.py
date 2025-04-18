@@ -9,8 +9,8 @@ from reactivex.abc import DisposableBase
 from typing_extensions import Optional, Unpack, override
 
 from ratmap_common import EventTarget
-from tkinter_rx.TkinterEvent import TkinterEvent
 
+from .TkinterEvent import TkinterEvent, TkinterEventDetail
 from .typing import BaseButtonKwargs, ButtonKwargs
 from .util import safe_callback, sync_observable_to_variable
 
@@ -30,6 +30,7 @@ class Button(ttk.Button):
     __state_disposer: Optional[DisposableBase]
 
     __event_target: EventTarget
+    __click_event: str
 
     def __init__(
         self, master: Optional[tk.Misc] = None, **kwargs: Unpack[ButtonKwargs]
@@ -43,6 +44,7 @@ class Button(ttk.Button):
         variable = kwargs.pop("textvariable", None)
         text_observable = kwargs.pop("textobservable", None)
         state_observable = kwargs.pop("stateobservable", None)
+        self.__click_event = kwargs.pop("clickevent", "click")
 
         super().__init__(
             master,
@@ -71,11 +73,8 @@ class Button(ttk.Button):
         if self.__command:
             self.__command()
 
-        event: tk.Event["Button"] = tk.Event()
-        event.widget = self
-        event.type = tk.EventType.VirtualEvent
-
-        self.__event_target.emit(ButtonEvent("click"))
+        detail: TkinterEventDetail["Button"] = TkinterEventDetail(self)
+        self.__event_target.emit(ButtonEvent(self.__click_event, detail=detail))
 
     @property
     def text_observable(self) -> Optional[Observable[str]]:

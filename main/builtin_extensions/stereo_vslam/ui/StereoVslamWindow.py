@@ -453,4 +453,5 @@ class StereoVslamWindow(tk.Toplevel):
         del self.is_calibrating_observable
         del self.inspect_observable
 
+        self.__event_target.dispose()
         return super().destroy()

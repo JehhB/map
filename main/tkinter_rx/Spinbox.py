@@ -9,6 +9,7 @@ from typing_extensions import Unpack, override
 from ratmap_common import EventTarget
 
 from .Entry import EntryEvent
+from .TkinterEvent import TkinterEventDetail
 from .typing import BaseSpinboxKwargs, SpinboxKwargs
 from .util import bind_subject_to_variable, safe_callback
 
@@ -31,6 +32,9 @@ class Spinbox(ttk.Spinbox):
     __blur_cbn: str
 
     __event_target: EventTarget
+    __change_event: str
+    __focus_event: str
+    __blur_event: str
 
     def __init__(
         self, master: Optional[tk.Misc] = None, **kwargs: Unpack[SpinboxKwargs]
@@ -38,8 +42,11 @@ class Spinbox(ttk.Spinbox):
         kwargs = kwargs.copy()
 
         variable = kwargs.pop("textvariable", None)
-        value_subject = kwargs.pop("value_subject", None)
-        state_observable = kwargs.pop("state_observable", None)
+        value_subject = kwargs.pop("valuesubject", None)
+        state_observable = kwargs.pop("stateobservable", None)
+        self.__change_event = kwargs.pop("changeevent", "change")
+        self.__focus_event = kwargs.pop("focusevent", "focus")
+        self.__blur_event = kwargs.pop("blurevent", "blur")
 
         super().__init__(master, **cast(BaseSpinboxKwargs, kwargs))
 
@@ -61,10 +68,12 @@ class Spinbox(ttk.Spinbox):
         self.__event_target = EventTarget()
 
         self.__focus_cbn = self.bind(
-            "<FocusIn>", lambda _: self.__event_target.emit(EntryEvent("focus"), self)
+            "<FocusIn>",
+            lambda _: self.__event_target.emit(EntryEvent(self.__focus_event), self),
         )
         self.__blur_cbn = self.bind(
-            "<FocusOut>", lambda _: self.__event_target.emit(EntryEvent("blur"), self)
+            "<FocusOut>",
+            lambda _: self.__event_target.emit(EntryEvent(self.__blur_event), self),
         )
 
     @property
@@ -85,8 +94,9 @@ class Spinbox(ttk.Spinbox):
             return
 
         def on_change_callback(new_val: float):
-            event = SpinboxEvent("on_change")
-            event.detail = new_val
+            event = SpinboxEvent(
+                self.__change_event, detail=TkinterEventDetail(self, new_val)
+            )
             self.__event_target.emit(event)
 
         (self.__value_disposer, self.__value_write_cbn) = bind_subject_to_variable(

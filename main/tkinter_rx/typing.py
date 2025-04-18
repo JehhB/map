@@ -79,6 +79,7 @@ class ButtonKwargs(BaseButtonKwargs, total=False):
     textvariable: tkinter.StringVar
     textobservable: "Observable[str]"
     stateobservable: "Observable[Literal['normal', 'active', 'disabled']]"
+    clickevent: str
 
 
 class BaseLabelKwargs(TypedDict, total=False):
@@ -168,6 +169,9 @@ class EntryKwargs(BaseEntryKwargs, total=False):
     textvariable: tkinter.StringVar
     textsubject: "Subject[str]"
     stateobservable: "Observable[Literal['normal', 'disabled', 'readonly']]"
+    changeevent: str
+    focusevent: str
+    blurevent: str
 
 
 class BaseSpinboxKwargs(TypedDict, total=False):
@@ -197,8 +201,11 @@ class BaseSpinboxKwargs(TypedDict, total=False):
 
 class SpinboxKwargs(BaseSpinboxKwargs, total=False):
     textvariable: tkinter.DoubleVar
-    value_subject: Subject[float]
-    state_observable: Observable[Literal["normal", "disabled", "readonly"]]
+    valuesubject: Subject[float]
+    stateobservable: Observable[Literal["normal", "disabled", "readonly"]]
+    changeevent: str
+    focusevent: str
+    blurevent: str
 
 
 class BaseScaleKwargs(TypedDict, total=False):
@@ -218,8 +225,11 @@ class BaseScaleKwargs(TypedDict, total=False):
 
 class ScaleKwargs(BaseScaleKwargs, total=False):
     variable: tkinter.DoubleVar
-    value_subject: Subject[float]
-    state_observable: Observable[Literal["normal", "disabled"]]
+    valuesubject: Subject[float]
+    stateobservable: Observable[Literal["normal", "disabled"]]
+    changeevent: str
+    focusevent: str
+    blurevent: str
 
 
 class SubMenuKwargs(TypedDict, total=False):

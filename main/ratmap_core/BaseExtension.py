@@ -1,6 +1,7 @@
 from abc import ABC
-from typing import Optional
+from typing import List, Optional
 
+from reactivex import operators
 from reactivex.abc import DisposableBase
 from typing_extensions import override
 
@@ -35,7 +36,6 @@ class BaseExtension(AbstractExtension, ABC):
     @extension_manager.setter
     def extension_manager(self, extension_manager: ExtensionManager):
         self.__extension_manager = extension_manager
-        self.__watch_dependency()
 
     @override
     def start(self) -> None:
@@ -46,13 +46,21 @@ class BaseExtension(AbstractExtension, ABC):
             if not extension.is_started:
                 raise RuntimeError(f'Extension with id "{dep}" has not started yet')
 
+        self.__watch_dependency(deps)
+
         return super().start()
 
-    def __watch_dependency(self):
+    @override
+    def stop(self) -> None:
+        super().stop()
+
         if self.__dependency_watch_disposer is not None:
             self.__dependency_watch_disposer.dispose()
 
-        deps = self.metadata.get("dependency", [])
+    def __watch_dependency(self, deps: List[str]):
+        if self.__dependency_watch_disposer is not None:
+            self.__dependency_watch_disposer.dispose()
+
         deps_stop_event = map(lambda id: "extension.stop." + id, deps)
 
         def close_dependency_handler(e: AbstractEvent):
