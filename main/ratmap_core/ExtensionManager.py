@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 from glob import glob
 from importlib import import_module
 from typing import TYPE_CHECKING, Dict
@@ -64,6 +65,15 @@ class ExtensionManager(EventTarget):
             extension.parent = self
 
             self.__extensions[key] = extension
+
+            try:
+                if self.__context.config.get(
+                    f"{extension.config_namespace}.enabled", default=False
+                ):
+                    extension.start()
+            except:
+                traceback.print_exc()
+
         except Exception as e:
             raise RuntimeError(
                 f"Failed to load extension {key} from {module}.{instance}: {e}"

@@ -4,6 +4,7 @@ from typing import Optional
 from ratmap_common import AbstractEvent, EventTarget
 from tkinter_rx import Menu
 
+from .Config import Config
 from .ExtensionManager import ExtensionManager
 from .ui import (
     MainGl,
@@ -18,6 +19,7 @@ from .ui import (
 
 
 class Application(EventTarget):
+    __config: Config
     __extension_manager: ExtensionManager
     __main_window: MainWindow
     __main_gl: MainGl
@@ -33,9 +35,16 @@ class Application(EventTarget):
     def __init__(self) -> None:
         super().__init__()
 
+        self.__config = Config()
         self.__main_window = MainWindow()
         self.__main_window.event_target.parent = self
         self.__main_gl = self.__main_window.main_gl
+
+        self.__main_menu = self.__main_window.main_menu
+        self.__edit_menu = self.__main_menu.edit_menu
+        self.__file_menu = self.__main_menu.file_menu
+        self.__navigate_menu = self.__main_menu.navigate_menu
+        self.__extension_menu = self.__main_menu.extension_menu
 
         self.__extension_manager = ExtensionManager(self)
         self.__extension_manager.parent = self
@@ -44,17 +53,6 @@ class Application(EventTarget):
             "activate.menu_main.extension.manage", self.open_window
         )
         self.__manage_extension_window = None
-
-        self.__main_menu = self.__main_window.main_menu
-        self.__edit_menu = self.__main_menu.edit_menu
-        self.__file_menu = self.__main_menu.file_menu
-        self.__navigate_menu = self.__main_menu.navigate_menu
-        self.__extension_menu = self.__main_menu.extension_menu
-
-        try:
-            self.__extension_manager.get("stereo_vslam").start()
-        except:
-            traceback.print_exc()
 
     def close_window(self):
         if self.__manage_extension_window is None:
@@ -77,10 +75,15 @@ class Application(EventTarget):
 
     def mainloop(self):
         self.__main_window.mainloop()
+        self.config.dispose()
 
     @property
     def extension_manager(self) -> ExtensionManager:
         return self.__extension_manager
+
+    @property
+    def config(self) -> Config:
+        return self.__config
 
     @property
     def main_window(self) -> MainWindow:

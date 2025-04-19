@@ -29,7 +29,7 @@ class EurocMavLoaderWindow(tk.Toplevel):
 
         self.title("EuRoC MAV Loader")
 
-        self.folder_path = BehaviorSubject("/mnt/c/Users/ASUS/Downloads/V1_01_easy")
+        self.folder_path = BehaviorSubject("")
 
         self.__event_target = EventTarget()
         self.__player_state: Optional[Observable[PlayerState]] = None

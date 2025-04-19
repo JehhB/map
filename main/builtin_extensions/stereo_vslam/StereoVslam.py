@@ -108,6 +108,8 @@ class StereoVslam(BaseExtension):
 
     @override
     def start(self) -> None:
+        super().start()
+
         self.left_image_subject = Subject()
         self.right_image_subject = Subject()
 
@@ -117,8 +119,6 @@ class StereoVslam(BaseExtension):
         self.context.extension_menu.add_command(
             label=StereoVslam.LABEL, command=self.__open_window
         )
-
-        super().start()
 
     @override
     def stop(self) -> None:
@@ -285,3 +285,7 @@ class StereoVslam(BaseExtension):
 
         result = self.__ros_bridge.inspect(detail.x / width, detail.y / height)
         self.__inspect_subject.on_next(result)
+
+    @property
+    def calibrator(self):
+        return self.__calibrator

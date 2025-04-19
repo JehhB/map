@@ -48,7 +48,10 @@ class BaseExtension(AbstractExtension, ABC):
 
         self.__watch_dependency(deps)
 
-        return super().start()
+        super().start()
+
+        id = self.metadata.get("id")
+        self.context.config.update(f"{self.config_namespace}.enabled", True)
 
     @override
     def stop(self) -> None:
@@ -56,6 +59,8 @@ class BaseExtension(AbstractExtension, ABC):
 
         if self.__dependency_watch_disposer is not None:
             self.__dependency_watch_disposer.dispose()
+
+        self.context.config.update(f"{self.config_namespace}.enabled", False)
 
     def __watch_dependency(self, deps: List[str]):
         if self.__dependency_watch_disposer is not None:
@@ -70,3 +75,8 @@ class BaseExtension(AbstractExtension, ABC):
         self.__dependency_watch_disposer = self.__extension_manager.add_event_listener(
             "extension.stop", close_dependency_handler
         )
+
+    @property
+    def config_namespace(self):
+        id = self.metadata.get("id")
+        return f"extensions.{id}"
