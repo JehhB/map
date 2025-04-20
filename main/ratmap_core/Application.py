@@ -75,6 +75,7 @@ class Application(EventTarget):
 
     def mainloop(self):
         self.__main_window.mainloop()
+        self.extension_manager.dispose()
         self.config.dispose()
 
     @property

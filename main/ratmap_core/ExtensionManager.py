@@ -3,6 +3,7 @@ import sys
 import traceback
 from glob import glob
 from importlib import import_module
+from tkinter import TclError
 from typing import TYPE_CHECKING, Dict
 
 import yaml
@@ -91,6 +92,12 @@ class ExtensionManager(EventTarget):
     @override
     def dispose(self) -> None:
         for _k, x in self.__extensions.items():
-            _ = x.stop()
+            try:
+                if x.is_started:
+                    _ = x.stop()
+            except TclError:
+                pass
+            except:
+                traceback.print_exc()
 
         return super().dispose()

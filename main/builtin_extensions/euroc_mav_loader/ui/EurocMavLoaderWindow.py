@@ -92,7 +92,9 @@ class EurocMavLoaderWindow(tk.Toplevel):
         fps_scale.pack(side=tk.LEFT, expand=tk.YES, fill=tk.X, padx=4)
 
         self.__start_map_button = Button(
-            control_frame, text="Start Mapping", clickevent="euroc_mav_loader.start_map"
+            control_frame,
+            text="Start Mapping",
+            clickevent="euroc_mav_loader.start_mapping",
         )
         self.__start_map_button.event_target.parent = self.__event_target
         self.__start_map_button.pack(side=tk.LEFT, padx=4)

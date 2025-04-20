@@ -66,6 +66,10 @@ class Scale(ttk.Scale):
         self.__value_subject = None
         self.__state_observable = None
 
+        if value_subject is None:
+            value_subject = cast(Subject[float], Subject())
+        self.value_subject = value_subject
+
         self.value_subject = value_subject
         self.state_observable = state_observable
 

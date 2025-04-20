@@ -3,9 +3,11 @@ from concurrent.futures import ThreadPoolExecutor
 from tkinter import messagebox
 from typing import Optional, Tuple, Union, final
 
+import reactivex
 from cv2.typing import MatLike
 from PIL.Image import Image
 from reactivex import Observable, Subject, empty, operators
+from reactivex.abc import DisposableBase
 from reactivex.subject import BehaviorSubject
 from typing_extensions import override
 
@@ -14,8 +16,10 @@ from ratmap_core import BaseExtension
 from tkinter_rx import MenuEvent
 from tkinter_rx.Label import LabelEvent
 from tkinter_rx.TkinterEvent import TkinterEventDetail
+from tkinter_rx.util import safe_dispose
 
 from .Calibrator import Calibrator, CalibratorParams
+from .CameraInfo import StereoCameraInfo
 from .RosBridge import RosBridge
 from .ui import StereoVslamWindow
 
@@ -47,11 +51,17 @@ class StereoVslam(BaseExtension):
 
     left_image_subject: Optional[Subject[Optional[Image]]]
     right_image_subject: Optional[Subject[Optional[Image]]]
+    timestamp_subject: Optional[Subject[int]]
+    stereo_image_observable: Optional[
+        Observable[Tuple[Optional[Image], Optional[Image], int, bool]]
+    ]
 
     __extension_window: Optional[StereoVslamWindow]
     __ros_bridge: Optional[RosBridge]
+    __ros_bridge_disposer: Optional[DisposableBase]
     __calibrator: Optional[Calibrator]
     __calibrator_params: CalibratorParamsHolder
+    __calibrator_disposer: Optional[DisposableBase]
     __inspect_subject: Subject[Tuple[float, float, float, float]]
 
     __calibration_executor: ThreadPoolExecutor
@@ -69,11 +79,15 @@ class StereoVslam(BaseExtension):
         super().__init__()
         self.__extension_window = None
         self.__ros_bridge = None
+        self.__ros_bridge_disposer = None
         self.__calibrator = None
         self.__calibration_executor = ThreadPoolExecutor(max_workers=1)
+        self.__calibrator_disposer = None
 
         self.left_image_subject = None
         self.right_image_subject = None
+        self.timestamp_subject = None
+        self.stereo_image_observable = None
 
         self.__calibrator_params = CalibratorParamsHolder()
         self.__inspect_subject = Subject()
@@ -112,25 +126,75 @@ class StereoVslam(BaseExtension):
 
         self.left_image_subject = Subject()
         self.right_image_subject = Subject()
+        self.timestamp_subject = Subject()
 
         self.__ros_bridge = RosBridge()
         self.__calibrator = Calibrator()
 
+        self.stereo_image_observable = reactivex.combine_latest(
+            self.left_image_subject,
+            self.right_image_subject,
+            self.timestamp_subject,
+            self.__calibrator.is_calibrating,
+        ).pipe(operators.throttle_first(1 / StereoVslam.TARGET_FPS))
+
+        safe_dispose(self.__calibrator_disposer)
+        self.__calibrator_disposer = self.stereo_image_observable.pipe(
+            operators.throttle_first(0.8)
+        ).subscribe(self.__calibrator.next)
+
+        safe_dispose(self.__ros_bridge_disposer)
+        self.__ros_bridge_disposer = reactivex.combine_latest(
+            self.stereo_image_observable, self.__calibrator.stereo_camera_info
+        ).subscribe(on_next=self.process_images)
+
         self.context.extension_menu.add_command(
             label=StereoVslam.LABEL, command=self.__open_window
+        )
+
+    def process_images(
+        self,
+        images: Tuple[
+            Tuple[Optional[Image], Optional[Image], int, bool],
+            Optional[StereoCameraInfo],
+        ],
+    ):
+        stereo_images, camera_info = images
+        left_image, right_image, _timestamp, is_calibrating = stereo_images
+
+        if (
+            left_image is None
+            or right_image is None
+            or camera_info is None
+            or self.__ros_bridge is None
+            or is_calibrating
+        ):
+            return
+
+        left_camera_info, right_camera_info, _stereo_info = camera_info
+
+        self.__ros_bridge.send_stereo_image(
+            left_image,
+            right_image,
+            left_camera_info,
+            right_camera_info,
         )
 
     @override
     def stop(self) -> None:
         super().stop()
 
-        if self.left_image_subject:
-            self.left_image_subject.dispose()
-            self.left_image_subject = None
+        safe_dispose(self.left_image_subject)
+        self.left_image_subject = None
 
-        if self.right_image_subject:
-            self.right_image_subject.dispose()
-            self.right_image_subject = None
+        safe_dispose(self.right_image_subject)
+        self.right_image_subject = None
+
+        safe_dispose(self.__calibrator_disposer)
+        self.__calibrator_disposer = None
+
+        safe_dispose(self.__ros_bridge_disposer)
+        self.__ros_bridge_disposer = None
 
         if self.__ros_bridge:
             self.__ros_bridge.destroy()
@@ -289,3 +353,15 @@ class StereoVslam(BaseExtension):
     @property
     def calibrator(self):
         return self.__calibrator
+
+    def start_calibration(self, params: Optional[CalibratorParams] = None):
+        if params is not None:
+            self.__calibrator_params.chessboard_rows.on_next(
+                params["chessboard_size"][0]
+            )
+            self.__calibrator_params.chessboard_cols.on_next(
+                params["chessboard_size"][1]
+            )
+            self.__calibrator_params.square_size.on_next(params["square_size"])
+        if self.__calibrator:
+            self.__calibrator.start(self.__calibrator_params.getParams())

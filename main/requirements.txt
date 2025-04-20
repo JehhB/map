@@ -2,6 +2,7 @@ actionlib==1.14.0
 angles==1.9.13
 base-local-planner==1.17.3
 bondpy==1.8.6
+camera-calibration-parsers==1.12.0
 catkin==0.8.10
 catkin-pkg==1.0.0
 cv-bridge==1.16.2
@@ -26,6 +27,7 @@ mypy-extensions==1.0.0
 numpy==1.24.4
 opencv-contrib-python==4.11.0.86
 pillow==10.4.0
+platformdirs==4.3.6
 PyOpenGL==3.1.9
 PyOpenGL-accelerate==3.1.9
 pyopengltk==0.0.4
@@ -72,5 +74,6 @@ tf2-ros==0.7.7
 tomli==2.2.1
 topic-tools==1.17.0
 turtlebot3-teleop==1.2.5
+types-PyYAML==6.0.12.20241230
 typing-extensions==4.13.0
 xacro==1.14.19

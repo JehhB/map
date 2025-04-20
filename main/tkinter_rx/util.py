@@ -1,18 +1,9 @@
 import tkinter as tk
-from tkinter import ttk
-from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import Callable, Optional, Set, Tuple, TypeVar, Union, overload
 
 from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
+from typing_extensions import override
 
 _T = TypeVar("_T")
 
@@ -110,3 +101,25 @@ def bind_subject_to_variable(
     disposer = sync_observable_to_variable(subject, var, master)  # type: ignore # pyright: ignore
 
     return (disposer, callback_name)
+
+
+class SetDisposer(DisposableBase):
+    __disposers: Set[DisposableBase]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.__disposers = set()
+
+    @override
+    def dispose(self) -> None:
+        for disposer in self.__disposers:
+            disposer.dispose()
+        self.__disposers = set()
+
+    def add(self, disposable: DisposableBase):
+        self.__disposers.add(disposable)
+
+
+def safe_dispose(disposable: Optional[DisposableBase]):
+    if disposable is not None:
+        disposable.dispose()

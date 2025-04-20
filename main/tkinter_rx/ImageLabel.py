@@ -55,7 +55,7 @@ class ImageLabel(tk.Label):
         del self.image_observable
 
         self.__image_observable = image_observable
-        if image_observable:
+        if image_observable is not None:
             self.__disposer = image_observable.subscribe(
                 on_next=safe_callback(self.master, self.update_image)
             )
