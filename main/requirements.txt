@@ -10,6 +10,7 @@ diagnostic-updater==1.11.0
 distro==1.9.0
 docutils==0.20.1
 dynamic-reconfigure==1.7.3
+evdev==1.9.1
 gazebo-ros==2.9.3
 gencpp==0.7.0
 geneus==3.0.0
@@ -28,12 +29,14 @@ numpy==1.24.4
 opencv-contrib-python==4.11.0.86
 pillow==10.4.0
 platformdirs==4.3.6
+pygame==2.6.1
 PyOpenGL==3.1.9
 PyOpenGL-accelerate==3.1.9
 pyopengltk==0.0.4
 pyparsing==3.1.4
 python-dateutil==2.9.0.post0
 python-qt-binding==0.4.4
+pyudev==0.24.3
 PyYAML==6.0.2
 qt-gui==0.4.2
 qt-gui-cpp==0.4.2
@@ -76,4 +79,4 @@ topic-tools==1.17.0
 turtlebot3-teleop==1.2.5
 types-PyYAML==6.0.12.20241230
 typing-extensions==4.13.0
-xacro==1.14.19
+xacro==1.14.20

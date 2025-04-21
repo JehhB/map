@@ -10,7 +10,7 @@ _T = TypeVar("_T", bound=AbstractEvent, default=AbstractEvent)
 
 
 class EventTarget(CategorizedSubject[_T]):
-    __parent: "Optional[EventTarget[_T]]"
+    __parent: "Optional[EventTarget[AbstractEvent]]"
     __parent_disposer: Optional[DisposableBase]
 
     def __init__(self) -> None:
@@ -28,7 +28,7 @@ class EventTarget(CategorizedSubject[_T]):
         return self.__parent
 
     @parent.setter
-    def parent(self, new_val: "Optional[EventTarget[_T]]"):
+    def parent(self, new_val: "Optional[EventTarget[AbstractEvent]]"):
         del self.parent
 
         self.__parent = new_val

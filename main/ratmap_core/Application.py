@@ -1,4 +1,3 @@
-import traceback
 from typing import Optional
 
 from ratmap_common import AbstractEvent, EventTarget
@@ -6,6 +5,7 @@ from tkinter_rx import Menu
 
 from .Config import Config
 from .ExtensionManager import ExtensionManager
+from .Joystick import Joystick
 from .ui import (
     MainGl,
     MainWindow,
@@ -23,6 +23,7 @@ class Application(EventTarget):
     __extension_manager: ExtensionManager
     __main_window: MainWindow
     __main_gl: MainGl
+    __joystick: Joystick
 
     __main_menu: MenuMain
     __file_menu: MenuFile
@@ -53,6 +54,8 @@ class Application(EventTarget):
             "activate.menu_main.extension.manage", self.open_window
         )
         self.__manage_extension_window = None
+        self.__joystick = Joystick()
+        self.__joystick.parent = self
 
     def close_window(self):
         if self.__manage_extension_window is None:
@@ -74,9 +77,12 @@ class Application(EventTarget):
         self.__manage_extension_window.protocol("WM_DELETE_WINDOW", self.close_window)
 
     def mainloop(self):
+        self.__joystick.start_thread()
         self.__main_window.mainloop()
-        self.extension_manager.dispose()
-        self.config.dispose()
+
+        self.__joystick.dispose()
+        self.__extension_manager.dispose()
+        self.__config.dispose()
 
     @property
     def extension_manager(self) -> ExtensionManager:
@@ -113,3 +119,7 @@ class Application(EventTarget):
     @property
     def extension_menu(self) -> Menu:
         return self.__extension_menu
+
+    @property
+    def joystick(self) -> Joystick:
+        return self.__joystick

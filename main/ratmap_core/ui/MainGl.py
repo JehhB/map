@@ -4,7 +4,8 @@ import ctypes
 import math
 import time
 import tkinter as tk
-from typing import List, final
+from threading import RLock
+from typing import List, Optional, final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -106,7 +107,9 @@ class MainGl(OpenGLFrame):
     DEFAULT_GL_WIDTH = 640
     DEFAULT_GL_HEIGHT = 480
     __event_target: EventTarget
-    __mesh: List[Mesh]
+    __mesh: List[Optional[Mesh]]
+
+    __lock: RLock
 
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(
@@ -116,6 +119,7 @@ class MainGl(OpenGLFrame):
         self.start_time = time.time()
         self.shader_program = None
 
+        self.__lock = RLock()
         self.__mesh = []
 
     @override
@@ -237,25 +241,27 @@ class MainGl(OpenGLFrame):
 
     @override
     def redraw(self):
-        # Clear the screen
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+        with self.__lock:
+            # Clear the screen
+            GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-        # Use shader program
-        GL.glUseProgram(self.shader_program)
+            # Use shader program
+            GL.glUseProgram(self.shader_program)
 
-        # Calculate rotation angle based on time
-        current_time = time.time() - self.start_time
-        rotation_angle = current_time * math.pi / 2  # Rotate 90 degrees per second
+            # Calculate rotation angle based on time
+            current_time = time.time() - self.start_time
+            rotation_angle = current_time * math.pi / 2  # Rotate 90 degrees per second
 
-        # Set uniform value for rotation
-        rotation_location = GL.glGetUniformLocation(self.shader_program, "rotation")
-        GL.glUniform1f(rotation_location, rotation_angle)
+            # Set uniform value for rotation
+            rotation_location = GL.glGetUniformLocation(self.shader_program, "rotation")
+            GL.glUniform1f(rotation_location, rotation_angle)
 
-        for mesh in self.__mesh:
-            mesh.draw()
+            for mesh in self.__mesh:
+                if mesh is not None:
+                    mesh.draw()
 
-        # Schedule the next redraw
-        _ = self.after(16, self.tkExpose, None)  # ~60 FPS
+            # Schedule the next redraw
+            _ = self.after(16, self.tkExpose, None)  # ~60 FPS
 
     @property
     def event_target(self):
@@ -263,24 +269,27 @@ class MainGl(OpenGLFrame):
 
     @override
     def destroy(self) -> None:
-        # Clean up OpenGL resources
-        if self.shader_program:
-            GL.glDeleteProgram(self.shader_program)
+        with self.__lock:
+            if self.shader_program:
+                GL.glDeleteProgram(self.shader_program)
 
-        for mesh in self.__mesh:
-            mesh.free()
-        self.__mesh = []
+            for mesh in self.__mesh:
+                if mesh is not None:
+                    mesh.free()
+            self.__mesh = []
 
-        self.__event_target.dispose()
+            self.__event_target.dispose()
+
         return super().destroy()
 
+    def add_mesh(self, mesh: Mesh) -> int:
+        with self.__lock:
+            ret = len(self.__mesh)
+            self.__mesh.append(mesh)
+            return ret
 
-# Example usage
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.title("OpenGL Rotating Triangle")
+    def remove_mesh(self, id: int) -> None:
+        self.__mesh[id] = None
 
-    main_gl = MainGl(root)
-    main_gl.pack(fill=tk.BOTH, expand=tk.YES)
-
-    root.mainloop()
+    def get_mesh(self, id: int) -> Optional[Mesh]:
+        return self.__mesh[id]
