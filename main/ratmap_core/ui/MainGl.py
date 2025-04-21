@@ -2,7 +2,6 @@
 
 import ctypes
 import math
-import time
 import tkinter as tk
 from threading import RLock
 from typing import List, Optional, final
@@ -11,18 +10,22 @@ import numpy as np
 from numpy.typing import NDArray
 from OpenGL import GL
 from pyopengltk import OpenGLFrame
+from pyrr import Matrix44
 from typing_extensions import override
 
 from ratmap_common.EventTarget import EventTarget
 
 
 class Mesh:
+    model_matrix: Matrix44
+
     def __init__(
         self,
         vertices: NDArray[np.float32],
         indices: NDArray[np.uint32],
         pos_loc: int = 0,
         color_loc: int = 1,
+        model_matrix: Optional[Matrix44] = None,
     ):
         self.__vao = GL.glGenVertexArrays(1)
         self.__vbo = 0
@@ -34,6 +37,12 @@ class Mesh:
         self.__updated = True
         self.__vertices = vertices
         self.__indeces = indices
+
+        self.model_matrix = (
+            model_matrix
+            if model_matrix is not None
+            else Matrix44.identity(dtype=np.float32)
+        )
 
     def __update_buffers(self):
         if not self.__updated:
@@ -83,10 +92,16 @@ class Mesh:
 
         self.__updated = True
 
-    def draw(self):
+    def draw(self, model_loc: int = -1):
         self.__update_buffers()
 
         GL.glBindVertexArray(self.__vao)
+
+        if model_loc >= 0:
+            GL.glUniformMatrix4fv(
+                model_loc, 1, GL.GL_FALSE, self.model_matrix.flatten()
+            )
+
         GL.glDrawElements(GL.GL_POINTS, 3, GL.GL_UNSIGNED_INT, ctypes.c_void_p(0))
         GL.glBindVertexArray(0)
 
@@ -109,6 +124,9 @@ class MainGl(OpenGLFrame):
     __event_target: EventTarget
     __mesh: List[Optional[Mesh]]
 
+    __view_matrix: Matrix44
+    __projection_matrix: Matrix44
+
     __lock: RLock
 
     def __init__(self, master: tk.Misc) -> None:
@@ -116,8 +134,10 @@ class MainGl(OpenGLFrame):
             master, width=MainGl.DEFAULT_GL_WIDTH, height=MainGl.DEFAULT_GL_HEIGHT
         )
         self.__event_target = EventTarget()
-        self.start_time = time.time()
         self.shader_program = None
+
+        self.__view_matrix = Matrix44.identity(dtype=np.float32)
+        self.__projection_matrix = Matrix44.identity(dtype=np.float32)
 
         self.__lock = RLock()
         self.__mesh = []
@@ -144,16 +164,14 @@ class MainGl(OpenGLFrame):
         in vec3 aColor;
         
         out vec3 vertexColor;
-        
-        uniform float rotation;
+
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
         
         void main()
         {
-            float s = sin(rotation);
-            float c = cos(rotation);
-            mat2 rotMatrix = mat2(c, -s, s, c);
-            vec2 rotatedPos = rotMatrix * aPos.xy;
-            gl_Position = vec4(rotatedPos.x, rotatedPos.y, aPos.z, 1.0);
+            gl_Position = projection * view * model * vec4(aPos, 1.0);
             vertexColor = aColor;
         }
         """
@@ -248,17 +266,25 @@ class MainGl(OpenGLFrame):
             # Use shader program
             GL.glUseProgram(self.shader_program)
 
-            # Calculate rotation angle based on time
-            current_time = time.time() - self.start_time
-            rotation_angle = current_time * math.pi / 2  # Rotate 90 degrees per second
+            model_loc = GL.glGetUniformLocation(self.shader_program, "model")
+            view_loc = GL.glGetUniformLocation(self.shader_program, "view")
+            proj_loc = GL.glGetUniformLocation(self.shader_program, "projection")
 
-            # Set uniform value for rotation
-            rotation_location = GL.glGetUniformLocation(self.shader_program, "rotation")
-            GL.glUniform1f(rotation_location, rotation_angle)
+            GL.glUniformMatrix4fv(
+                view_loc, 1, GL.GL_FALSE, self.__view_matrix.flatten()
+            )
+            GL.glUniformMatrix4fv(
+                proj_loc, 1, GL.GL_FALSE, self.__projection_matrix.flatten()
+            )
 
             for mesh in self.__mesh:
                 if mesh is not None:
-                    mesh.draw()
+                    rotation = Matrix44.from_z_rotation(
+                        math.radians(1), dtype=np.float32
+                    )
+
+                    mesh.model_matrix = rotation @ mesh.model_matrix
+                    mesh.draw(model_loc)
 
             # Schedule the next redraw
             _ = self.after(16, self.tkExpose, None)  # ~60 FPS
