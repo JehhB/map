@@ -365,3 +365,7 @@ class StereoVslam(BaseExtension):
             self.__calibrator_params.square_size.on_next(params["square_size"])
         if self.__calibrator:
             self.__calibrator.start(self.__calibrator_params.getParams())
+
+    def reset_map(self):
+        if self.__ros_bridge:
+            self.__ros_bridge.reset()

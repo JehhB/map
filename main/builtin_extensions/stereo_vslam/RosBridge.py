@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -131,6 +131,7 @@ class RosBridge:
         )
         print(len(_points))
 
+    """
     def process_cloud_map(self, cloud_map: PointCloud2):
         # Extract points from ROS PointCloud2 message
         cloud_map.fields[3].datatype = 6  # type: ignore # pyright: ignore
@@ -157,6 +158,7 @@ class RosBridge:
             point_data.extend([x, y, z, r, g, b])
 
         points_array = np.array(point_data, dtype=np.float32)
+    """
 
     def destroy(self):
         self.left_image_pub.unregister()
@@ -213,3 +215,7 @@ class RosBridge:
             depth = 0
 
         return (float(x), float(y), float(d), float(depth))
+
+    def reset(self):
+        self.reset_service()
+        pass

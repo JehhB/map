@@ -80,6 +80,9 @@ class Calibrator:
         self.is_calibrating.on_next(True)
         self.stereo_camera_info.on_next(None)
 
+    def stop(self):
+        self.is_calibrating.on_next(False)
+
     def next(
         self, images: Tuple[Optional[Image.Image], Optional[Image.Image], int, bool]
     ):
