@@ -1,120 +1,18 @@
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportAny=false
 
-import ctypes
-import math
 import tkinter as tk
 from threading import RLock
 from typing import List, Optional, final
 
 import numpy as np
-from numpy.typing import NDArray
 from OpenGL import GL
 from pyopengltk import OpenGLFrame
-from pyrr import Matrix44
+from pyrr import Matrix44, Vector3
 from typing_extensions import override
 
 from ratmap_common.EventTarget import EventTarget
 
-
-class Mesh:
-    model_matrix: Matrix44
-
-    def __init__(
-        self,
-        vertices: NDArray[np.float32],
-        indices: NDArray[np.uint32],
-        pos_loc: int = 0,
-        color_loc: int = 1,
-        model_matrix: Optional[Matrix44] = None,
-    ):
-        self.__vao = GL.glGenVertexArrays(1)
-        self.__vbo = 0
-        self.__ebo = 0
-
-        self.__pos_loc = pos_loc
-        self.__color_loc = color_loc
-
-        self.__updated = True
-        self.__vertices = vertices
-        self.__indeces = indices
-
-        self.model_matrix = (
-            model_matrix
-            if model_matrix is not None
-            else Matrix44.identity(dtype=np.float32)
-        )
-
-    def __update_buffers(self):
-        if not self.__updated:
-            return
-
-        GL.glBindVertexArray(self.__vao)
-
-        if self.__vbo != 0:
-            GL.glDeleteBuffers(1, [self.__vbo])
-        if self.__ebo != 0:
-            GL.glDeleteBuffers(1, [self.__ebo])
-
-        self.__vbo = GL.glGenBuffers(1)
-        self.__ebo = GL.glGenBuffers(1)
-
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.__vbo)
-        GL.glBufferData(
-            GL.GL_ARRAY_BUFFER,
-            self.__vertices.nbytes,
-            self.__vertices,
-            GL.GL_STATIC_DRAW,
-        )
-
-        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, self.__ebo)
-        GL.glBufferData(
-            GL.GL_ELEMENT_ARRAY_BUFFER,
-            self.__indeces.nbytes,
-            self.__indeces,
-            GL.GL_STATIC_DRAW,
-        )
-
-        stride = 6 * 4  # x,y,z,r,g,b (6 floats, 4 bytes each)
-
-        GL.glEnableVertexAttribArray(self.__pos_loc)
-        GL.glVertexAttribPointer(
-            self.__pos_loc, 3, GL.GL_FLOAT, False, stride, ctypes.c_void_p(0)
-        )
-
-        # Color: location 1
-        GL.glEnableVertexAttribArray(self.__color_loc)
-        GL.glVertexAttribPointer(
-            self.__color_loc, 3, GL.GL_FLOAT, False, stride, ctypes.c_void_p(12)
-        )
-
-        GL.glBindVertexArray(0)
-        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
-
-        self.__updated = True
-
-    def draw(self, model_loc: int = -1):
-        self.__update_buffers()
-
-        GL.glBindVertexArray(self.__vao)
-
-        if model_loc >= 0:
-            GL.glUniformMatrix4fv(
-                model_loc, 1, GL.GL_FALSE, self.model_matrix.flatten()
-            )
-
-        GL.glDrawElements(GL.GL_POINTS, 3, GL.GL_UNSIGNED_INT, ctypes.c_void_p(0))
-        GL.glBindVertexArray(0)
-
-    def free(self):
-        GL.glDeleteVertexArrays(1, [self.__vao])
-
-        if self.__vbo != 0:
-            GL.glDeleteBuffers(1, [self.__vbo])
-        self.__vbo = 0
-
-        if self.__ebo != 0:
-            GL.glDeleteBuffers(1, [self.__ebo])
-        self.__ebo = 0
+from .Mesh import Mesh
 
 
 @final
@@ -123,9 +21,6 @@ class MainGl(OpenGLFrame):
     DEFAULT_GL_HEIGHT = 480
     __event_target: EventTarget
     __mesh: List[Optional[Mesh]]
-
-    __view_matrix: Matrix44
-    __projection_matrix: Matrix44
 
     __lock: RLock
 
@@ -136,11 +31,11 @@ class MainGl(OpenGLFrame):
         self.__event_target = EventTarget()
         self.shader_program = None
 
-        self.__view_matrix = Matrix44.identity(dtype=np.float32)
-        self.__projection_matrix = Matrix44.identity(dtype=np.float32)
-
         self.__lock = RLock()
         self.__mesh = []
+
+        self.__view_matrix: Matrix44
+        self.__projection_matrix: Matrix44
 
     @override
     def initgl(self):
@@ -148,6 +43,20 @@ class MainGl(OpenGLFrame):
         GL.glViewport(0, 0, self.width, self.height)
         GL.glClearColor(0.1, 0.1, 0.1, 1.0)
         GL.glPointSize(10)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+
+        eye = Vector3([0.0, 0.0, 5.0])
+        target = Vector3([0.0, 0.0, 0.0])
+        up = Vector3([0.0, 1.0, 0.0])
+        self.__view_matrix = Matrix44.look_at(eye, target, up, dtype=np.float32)
+        self.__projection_matrix = Matrix44.perspective_projection(
+            45, self.width / self.height, 0.1, 100.0, dtype=np.float32
+        )
+
+        """
+        self.__view_matrix = Matrix44.identity(dtype=np.float32)
+        self.__projection_matrix = Matrix44.identity(dtype=np.float32)
+        """
 
         # Create shaders and program
         self.create_shader_program()
@@ -261,7 +170,7 @@ class MainGl(OpenGLFrame):
     def redraw(self):
         with self.__lock:
             # Clear the screen
-            GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
             # Use shader program
             GL.glUseProgram(self.shader_program)
@@ -279,11 +188,12 @@ class MainGl(OpenGLFrame):
 
             for mesh in self.__mesh:
                 if mesh is not None:
+                    """
                     rotation = Matrix44.from_z_rotation(
                         math.radians(1), dtype=np.float32
                     )
-
-                    mesh.model_matrix = rotation @ mesh.model_matrix
+                    mesh.model_matrix = cast(Matrix44, rotation @ mesh.model_matrix)
+                    """
                     mesh.draw(model_loc)
 
             # Schedule the next redraw
