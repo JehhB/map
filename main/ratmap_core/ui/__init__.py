@@ -1,3 +1,4 @@
+from .Camera import Camera
 from .MainGl import MainGl
 from .MainWindow import MainWindow
 from .ManageExtensionsWindow import ManageExtensionsWindow
@@ -9,6 +10,7 @@ from .MenuNavigate import MenuNavigate
 from .Mesh import Mesh
 
 __all__ = [
+    "Camera",
     "MainGl",
     "MainWindow",
     "ManageExtensionsWindow",

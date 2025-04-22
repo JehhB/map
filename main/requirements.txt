@@ -23,6 +23,7 @@ interactive-markers==1.12.0
 joint-state-publisher==1.15.1
 laser-geometry==1.6.7
 message-filters==1.17.0
+multipledispatch==1.0.0
 mypy==1.14.1
 mypy-extensions==1.0.0
 numpy==1.24.4
@@ -34,6 +35,7 @@ PyOpenGL==3.1.9
 PyOpenGL-accelerate==3.1.9
 pyopengltk==0.0.4
 pyparsing==3.1.4
+pyrr==0.10.3
 python-dateutil==2.9.0.post0
 python-qt-binding==0.4.4
 pyudev==0.24.3

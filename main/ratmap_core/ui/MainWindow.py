@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import tkinter as tk
 
 from typing_extensions import override
@@ -30,6 +32,7 @@ class MainWindow(tk.Tk):
         self.__main_gl.pack(expand=tk.YES, fill=tk.BOTH)
 
         _ = self.config(menu=self.__main_menu)
+        _ = self.bind("<KeyPress>", self.__handle_movement)
 
     @property
     def event_target(self):
@@ -47,3 +50,13 @@ class MainWindow(tk.Tk):
     @property
     def main_menu(self):
         return self.__main_menu
+
+    def __handle_movement(self, event: tk.Event[tk.Misc]):
+        if event.char == "w":
+            self.__main_gl.camera.move("forward", delta_time=0.05)
+        elif event.char == "s":
+            self.__main_gl.camera.move("backward", delta_time=0.05)
+        elif event.char == "a":
+            self.__main_gl.camera.move("left", delta_time=0.05)
+        elif event.char == "d":
+            self.__main_gl.camera.move("right", delta_time=0.05)

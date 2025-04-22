@@ -264,8 +264,11 @@ class Joystick(EventTarget[JoystickEvent]):
                     detail = self.__map_generic_controller(detail)
 
                 if self.__prev_detail != detail:
-                    event = JoystickEvent("joystick", self, detail)
+                    event = JoystickEvent("joystick.change", self, detail)
                     self.emit(event)
+
+                event = JoystickEvent("joystick.poll", self, detail)
+                self.emit(event)
 
                 self.__prev_detail = detail
 

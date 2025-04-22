@@ -1,8 +1,11 @@
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportAny=false
 
+from __future__ import annotations
+
+import math
 import tkinter as tk
 from threading import RLock
-from typing import List, Optional, final
+from typing import List, Optional, Tuple, final
 
 import numpy as np
 from OpenGL import GL
@@ -12,6 +15,7 @@ from typing_extensions import override
 
 from ratmap_common.EventTarget import EventTarget
 
+from .Camera import Camera
 from .Mesh import Mesh
 
 
@@ -34,8 +38,8 @@ class MainGl(OpenGLFrame):
         self.__lock = RLock()
         self.__mesh = []
 
-        self.__view_matrix: Matrix44
-        self.__projection_matrix: Matrix44
+        self.__camera: Camera
+        self.__last_clicked: Optional[Tuple[int, int]] = None
 
     @override
     def initgl(self):
@@ -45,6 +49,7 @@ class MainGl(OpenGLFrame):
         GL.glPointSize(10)
         GL.glEnable(GL.GL_DEPTH_TEST)
 
+        """
         eye = Vector3([0.0, 0.0, 5.0])
         target = Vector3([0.0, 0.0, 0.0])
         up = Vector3([0.0, 1.0, 0.0])
@@ -52,17 +57,18 @@ class MainGl(OpenGLFrame):
         self.__projection_matrix = Matrix44.perspective_projection(
             45, self.width / self.height, 0.1, 100.0, dtype=np.float32
         )
-
         """
-        self.__view_matrix = Matrix44.identity(dtype=np.float32)
-        self.__projection_matrix = Matrix44.identity(dtype=np.float32)
-        """
+        self.__camera = Camera(Vector3([0.0, 0.0, 5.0]))
 
         # Create shaders and program
         self.create_shader_program()
 
         # Create vertex buffer
         self.setup_triangle()
+
+        _ = self.bind("<Configure>", self.__handle_resize)
+        _ = self.bind("<B1-Motion>", self.__on_drag)
+        _ = self.bind("<ButtonRelease-1>", self.__release_hold)
 
     def create_shader_program(self):
         # Vertex Shader source code - using GLSL 1.30
@@ -180,20 +186,18 @@ class MainGl(OpenGLFrame):
             proj_loc = GL.glGetUniformLocation(self.shader_program, "projection")
 
             GL.glUniformMatrix4fv(
-                view_loc, 1, GL.GL_FALSE, self.__view_matrix.flatten()
+                view_loc, 1, GL.GL_FALSE, self.__camera.view_matrix.flatten()
             )
             GL.glUniformMatrix4fv(
-                proj_loc, 1, GL.GL_FALSE, self.__projection_matrix.flatten()
+                proj_loc, 1, GL.GL_FALSE, self.__camera.projection_matrix.flatten()
             )
 
             for mesh in self.__mesh:
                 if mesh is not None:
-                    """
                     rotation = Matrix44.from_z_rotation(
                         math.radians(1), dtype=np.float32
                     )
-                    mesh.model_matrix = cast(Matrix44, rotation @ mesh.model_matrix)
-                    """
+                    mesh.model_matrix = rotation @ mesh.model_matrix
                     mesh.draw(model_loc)
 
             # Schedule the next redraw
@@ -229,3 +233,33 @@ class MainGl(OpenGLFrame):
 
     def get_mesh(self, id: int) -> Optional[Mesh]:
         return self.__mesh[id]
+
+    @property
+    def camera(self):
+        return self.__camera
+
+    def __handle_resize(self, e: tk.Event[tk.Misc]):
+        GL.glViewport(0, 0, e.width, e.height)
+        self.__camera.aspect_ratio = e.width / e.height
+
+    def __on_drag(self, event: tk.Event[tk.Misc]):
+        mouse_sensitivity = 0.1
+
+        is_panning = isinstance(event.state, int) and event.state & 0x0001
+
+        if self.__last_clicked is not None:
+            x_offset = event.x - self.__last_clicked[0]
+            y_offset = event.y - self.__last_clicked[1]
+            if is_panning:
+                self.__camera.pan(
+                    -x_offset * mouse_sensitivity, y_offset * mouse_sensitivity, 0.5
+                )
+            else:
+                self.__camera.look_around(
+                    -x_offset * mouse_sensitivity, y_offset * mouse_sensitivity
+                )
+
+        self.__last_clicked = (event.x, event.y)
+
+    def __release_hold(self, _e: tk.Event[tk.Misc]):
+        self.__last_clicked = None

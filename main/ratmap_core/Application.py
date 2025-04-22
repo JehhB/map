@@ -2,10 +2,11 @@ from typing import Optional
 
 from ratmap_common import AbstractEvent, EventTarget
 from tkinter_rx import Menu
+from tkinter_rx.util import SetDisposer
 
 from .Config import Config
 from .ExtensionManager import ExtensionManager
-from .Joystick import Joystick
+from .Joystick import Joystick, JoystickEvent
 from .ui import (
     MainGl,
     MainWindow,
@@ -32,6 +33,7 @@ class Application(EventTarget):
     __navigate_menu: MenuNavigate
 
     __manage_extension_window: Optional[ManageExtensionsWindow]
+    __disposer: SetDisposer
 
     def __init__(self) -> None:
         super().__init__()
@@ -50,12 +52,19 @@ class Application(EventTarget):
         self.__extension_manager = ExtensionManager(self)
         self.__extension_manager.parent = self
 
-        _ = self.add_event_listener(
-            "activate.menu_main.extension.manage", self.open_window
+        self.__disposer = SetDisposer()
+        self.__disposer.add(
+            self.add_event_listener(
+                "activate.menu_main.extension.manage", self.open_window
+            )
         )
         self.__manage_extension_window = None
         self.__joystick = Joystick()
         self.__joystick.parent = self
+
+        self.__disposer.add(
+            self.__joystick.add_event_listener("joystick.poll", self.__handle_movement)
+        )
 
     def close_window(self):
         if self.__manage_extension_window is None:
@@ -123,3 +132,22 @@ class Application(EventTarget):
     @property
     def joystick(self) -> Joystick:
         return self.__joystick
+
+    def __handle_movement(self, event: JoystickEvent):
+        if not hasattr(self.__main_gl, "camera"):
+            return
+
+        detail = event.detail
+        offsets = detail.left_stick
+        is_rotating = detail.right_bumper
+        is_panning = detail.left_bumper
+
+        if abs(offsets[0]) < 0.01 and abs(offsets[1]) < 0.01:
+            return
+
+        if is_rotating:
+            self.__main_gl.camera.look_around(offsets[0], -offsets[1])
+        elif is_panning:
+            self.__main_gl.camera.pan(-offsets[0], offsets[1], delta_time=0.5)
+        else:
+            self.__main_gl.camera.walk(offsets[0], -offsets[1], delta_time=0.5)
