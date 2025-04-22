@@ -8,6 +8,7 @@ from pygame import joystick
 from typing_extensions import override
 
 from ratmap_common import AbstractEvent, EventTarget
+from ratmap_common.BaseEvent import BaseEvent
 
 
 @dataclass
@@ -76,7 +77,7 @@ class JoystickEventDetail:
         )
 
 
-class JoystickEvent(AbstractEvent):
+class JoystickEvent(BaseEvent):
     detail: JoystickEventDetail
 
     def __init__(

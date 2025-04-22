@@ -1,4 +1,5 @@
-from typing import Optional, Tuple
+import traceback
+from typing import Callable, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -7,6 +8,7 @@ import rospy
 import sensor_msgs.point_cloud2 as pc2
 from cv2.typing import MatLike
 from cv_bridge import CvBridge
+from numpy.typing import NDArray
 from PIL.Image import Image
 from reactivex import Observable, operators
 from reactivex.subject import BehaviorSubject
@@ -17,10 +19,12 @@ from sensor_msgs.msg import PointCloud2
 from std_srvs.srv import Empty
 from stereo_msgs.msg import DisparityImage
 
+from ratmap_common.EventTarget import EventTarget
+
 from .CameraInfo import CameraInfo
 
 
-class RosBridge:
+class RosBridge(EventTarget):
     bridge: CvBridge
 
     left_image_pub: Publisher
@@ -35,13 +39,19 @@ class RosBridge:
     disparity_image_observable: Observable[Optional[MatLike]]
 
     reset_service: ServiceProxy
+    __points_callback: Optional[Callable[[NDArray[np.float32]], None]]
 
-    def __init__(self):
+    def __init__(
+        self, points_callback: Optional[Callable[[NDArray[np.float32]], None]] = None
+    ):
+        super().__init__()
+
         if not rosgraph.is_master_online():
             raise RuntimeError("roscore is not running")
 
         rospy.init_node("main_map")
         self.bridge = CvBridge()
+        self.__points_callback = points_callback
 
         self.left_image_pub = Publisher(
             "/stereo_camera/left/image_raw", ImageRos, queue_size=10
@@ -57,7 +67,7 @@ class RosBridge:
         )
 
         self.cloud_map_sub = Subscriber(
-            "/cloud_map", PointCloud2, self.process_cloud_map, queue_size=10
+            "/cloud_map", PointCloud2, self.__process_cloud_map, queue_size=10
         )
 
         self.disparity_subject = BehaviorSubject(None)
@@ -125,40 +135,27 @@ class RosBridge:
         self.left_image_pub.publish(left_image_msg)
         self.right_image_pub.publish(right_image_msg)
 
-    def process_cloud_map(self, cloud_map: PointCloud2):
-        _points = pc2.read_points_list(
-            cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
-        )
-        print(len(_points))
-
-    """
-    def process_cloud_map(self, cloud_map: PointCloud2):
+    def __process_cloud_map(self, cloud_map: PointCloud2):
         # Extract points from ROS PointCloud2 message
-        cloud_map.fields[3].datatype = 6  # type: ignore # pyright: ignore
+
         _points = pc2.read_points_list(
             cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
         )
+        points_array = np.array(_points, dtype=np.float32)
 
-        # Convert the points to a format suitable for the visualizer
-        # Each point needs to have position (x,y,z) and color (r,g,b)
-        point_data: List[float] = []
+        # Extract xyz and rgb columns
+        xyz = points_array[:, :3]
+        rgb_ints = points_array[:, 3].view(np.uint32)
 
-        for point in _points:
-            x, y, z = point[0], point[1], point[2]
+        r = ((rgb_ints >> 16) & 0xFF) / 255.0
+        g = ((rgb_ints >> 8) & 0xFF) / 255.0
+        b = (rgb_ints & 0xFF) / 255.0
 
-            # Extract RGB from the packed format
-            rgb = point[3]
-            rgb_int = int(rgb)
-            # Unpack RGB values (typically stored as a 32-bit integer)
-            r = ((rgb_int >> 16) & 0xFF) / 255.0
-            g = ((rgb_int >> 8) & 0xFF) / 255.0
-            b = (rgb_int & 0xFF) / 255.0
+        colors = np.stack([r, g, b], axis=1)
+        points_array = np.hstack([xyz, colors], dtype=np.float32)
 
-            # Add position and color for each point
-            point_data.extend([x, y, z, r, g, b])
-
-        points_array = np.array(point_data, dtype=np.float32)
-    """
+        if self.__points_callback is not None:
+            self.__points_callback(points_array)
 
     def destroy(self):
         self.left_image_pub.unregister()
@@ -168,6 +165,7 @@ class RosBridge:
         self.cloud_map_sub.unregister()
         self.disparity_image_sub.unregister()
         self.disparity_subject.on_completed()
+
         rospy.signal_shutdown("Don't need anymore")
 
     def convert_disparity_to_mat(
@@ -217,5 +215,7 @@ class RosBridge:
         return (float(x), float(y), float(d), float(depth))
 
     def reset(self):
-        self.reset_service()
-        pass
+        try:
+            self.reset_service()
+        except:
+            traceback.print_exc()

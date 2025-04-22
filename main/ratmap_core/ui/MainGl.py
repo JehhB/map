@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import tkinter as tk
 from threading import RLock
-from typing import List, Optional, Tuple, final
+from typing import Callable, List, Optional, Tuple, final
 
 import numpy as np
 from OpenGL import GL
@@ -46,7 +46,7 @@ class MainGl(OpenGLFrame):
         # Set up viewport and clear color
         GL.glViewport(0, 0, self.width, self.height)
         GL.glClearColor(0.1, 0.1, 0.1, 1.0)
-        GL.glPointSize(10)
+        GL.glPointSize(5)
         GL.glEnable(GL.GL_DEPTH_TEST)
 
         """
@@ -62,9 +62,6 @@ class MainGl(OpenGLFrame):
 
         # Create shaders and program
         self.create_shader_program()
-
-        # Create vertex buffer
-        self.setup_triangle()
 
         _ = self.bind("<Configure>", self.__handle_resize)
         _ = self.bind("<B1-Motion>", self.__on_drag)
@@ -143,35 +140,6 @@ class MainGl(OpenGLFrame):
                     f"ERROR::PROGRAM_LINKING_ERROR of type: {shader_type}\n{info_log.decode('ascii')}"
                 )
 
-    def setup_triangle(self):
-        # Triangle vertices with position (x, y, z) and color (r, g, b)
-        vertices = np.array(
-            [
-                # Positions (x, y, z)    # Colors (r, g, b)
-                -0.5,
-                -0.5,
-                0.0,
-                1.0,
-                0.0,
-                0.0,  # Bottom-left, red
-                0.5,
-                -0.5,
-                0.0,
-                0.0,
-                1.0,
-                0.0,  # Bottom-right, green
-                0.0,
-                0.5,
-                0.0,
-                0.0,
-                0.0,
-                1.0,  # Top, blue
-            ],
-            dtype=np.float32,
-        )
-        indeces = np.array([0, 1, 2], dtype=np.uint32)
-        self.__mesh.append(Mesh(vertices, indeces))
-
     @override
     def redraw(self):
         with self.__lock:
@@ -194,10 +162,6 @@ class MainGl(OpenGLFrame):
 
             for mesh in self.__mesh:
                 if mesh is not None:
-                    rotation = Matrix44.from_z_rotation(
-                        math.radians(1), dtype=np.float32
-                    )
-                    mesh.model_matrix = rotation @ mesh.model_matrix
                     mesh.draw(model_loc)
 
             # Schedule the next redraw
@@ -228,11 +192,23 @@ class MainGl(OpenGLFrame):
             self.__mesh.append(mesh)
             return ret
 
+    def new_mesh(self) -> int:
+        mesh = Mesh()
+        return self.add_mesh(mesh)
+
     def remove_mesh(self, id: int) -> None:
-        self.__mesh[id] = None
+        with self.__lock:
+            self.__mesh[id] = None
 
     def get_mesh(self, id: int) -> Optional[Mesh]:
-        return self.__mesh[id]
+        with self.__lock:
+            return self.__mesh[id]
+
+    def update_mesh(self, id: int, callback: Callable[[Mesh], None]) -> None:
+        with self.__lock:
+            mesh = self.__mesh[id]
+            if mesh is not None:
+                callback(mesh)
 
     @property
     def camera(self):

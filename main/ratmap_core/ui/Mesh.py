@@ -1,6 +1,7 @@
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportAny=false
 
 import ctypes
+from threading import RLock
 from typing import Optional
 
 import numpy as np
@@ -11,15 +12,20 @@ from pyrr import Matrix44
 
 class Mesh:
     model_matrix: Matrix44
+    type: int
 
     def __init__(
         self,
-        vertices: NDArray[np.float32],
-        indices: NDArray[np.uint32],
+        vertices: Optional[NDArray[np.float32]] = None,
+        indices: Optional[NDArray[np.uint32]] = None,
         pos_loc: int = 0,
         color_loc: int = 1,
         model_matrix: Optional[Matrix44] = None,
+        type: int = GL.GL_POINTS,
     ):
+        self.__lock = RLock()
+        self.type = type
+
         self.__vao = GL.glGenVertexArrays(1)
         self.__vbo = 0
         self.__ebo = 0
@@ -28,8 +34,14 @@ class Mesh:
         self.__color_loc = color_loc
 
         self.__updated = True
-        self.__vertices = vertices
-        self.__indeces = indices
+        self.__vertices = (
+            vertices if vertices is not None else np.array([], dtype=np.float32)
+        )
+        self.__indices = (
+            indices
+            if indices is not None
+            else np.arange(self.__vertices.size, dtype=np.uint32)
+        )
 
         self.model_matrix = (
             model_matrix
@@ -62,8 +74,8 @@ class Mesh:
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, self.__ebo)
         GL.glBufferData(
             GL.GL_ELEMENT_ARRAY_BUFFER,
-            self.__indeces.nbytes,
-            self.__indeces,
+            self.__indices.nbytes,
+            self.__indices,
             GL.GL_STATIC_DRAW,
         )
 
@@ -83,20 +95,26 @@ class Mesh:
         GL.glBindVertexArray(0)
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
 
-        self.__updated = True
+        self.__updated = False
 
     def draw(self, model_loc: int = -1):
-        self.__update_buffers()
+        with self.__lock:
+            self.__update_buffers()
 
-        GL.glBindVertexArray(self.__vao)
+            GL.glBindVertexArray(self.__vao)
 
-        if model_loc >= 0:
-            GL.glUniformMatrix4fv(
-                model_loc, 1, GL.GL_FALSE, self.model_matrix.flatten()
+            if model_loc >= 0:
+                GL.glUniformMatrix4fv(
+                    model_loc, 1, GL.GL_FALSE, self.model_matrix.flatten()
+                )
+
+            GL.glDrawElements(
+                self.type,
+                self.__indices.size,
+                GL.GL_UNSIGNED_INT,
+                ctypes.c_void_p(0),
             )
-
-        GL.glDrawElements(GL.GL_POINTS, 3, GL.GL_UNSIGNED_INT, ctypes.c_void_p(0))
-        GL.glBindVertexArray(0)
+            GL.glBindVertexArray(0)
 
     def free(self):
         GL.glDeleteVertexArrays(1, [self.__vao])
@@ -108,3 +126,23 @@ class Mesh:
         if self.__ebo != 0:
             GL.glDeleteBuffers(1, [self.__ebo])
         self.__ebo = 0
+
+    @property
+    def vertices(self):
+        return self.__vertices
+
+    @vertices.setter
+    def vertices(self, vertices: NDArray[np.float32]):
+        with self.__lock:
+            self.__vertices = vertices
+            self.__updated = True
+
+    @property
+    def indices(self):
+        return self.__indices
+
+    @indices.setter
+    def indices(self, indices: NDArray[np.uint32]):
+        with self.__lock:
+            self.__indices = indices
+            self.__updated = True

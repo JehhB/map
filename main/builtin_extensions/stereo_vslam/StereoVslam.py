@@ -3,8 +3,10 @@ from concurrent.futures import ThreadPoolExecutor
 from tkinter import messagebox
 from typing import Optional, Tuple, Union, final
 
+import numpy as np
 import reactivex
 from cv2.typing import MatLike
+from numpy.typing import NDArray
 from PIL.Image import Image
 from reactivex import Observable, Subject, empty, operators
 from reactivex.abc import DisposableBase
@@ -13,6 +15,8 @@ from typing_extensions import override
 
 from ratmap_common import AbstractEvent, ExtensionMetadata
 from ratmap_core import BaseExtension
+from ratmap_core.ui import MainGl
+from ratmap_core.ui.Mesh import Mesh
 from tkinter_rx import MenuEvent
 from tkinter_rx.Label import LabelEvent
 from tkinter_rx.TkinterEvent import TkinterEventDetail
@@ -65,6 +69,7 @@ class StereoVslam(BaseExtension):
     __inspect_subject: Subject[Tuple[float, float, float, float]]
 
     __calibration_executor: ThreadPoolExecutor
+    __mesh_id: int
 
     @property
     @override
@@ -83,6 +88,7 @@ class StereoVslam(BaseExtension):
         self.__calibrator = None
         self.__calibration_executor = ThreadPoolExecutor(max_workers=1)
         self.__calibrator_disposer = None
+        self.__mesh_id = -1
 
         self.left_image_subject = None
         self.right_image_subject = None
@@ -91,6 +97,8 @@ class StereoVslam(BaseExtension):
 
         self.__calibrator_params = CalibratorParamsHolder()
         self.__inspect_subject = Subject()
+
+        self.__main_gl: MainGl
 
         _ = self.add_event_listener(
             "activate.stereo_vslam_menu.file.load_calibration",
@@ -120,6 +128,18 @@ class StereoVslam(BaseExtension):
 
         _ = self.add_event_listener("hover.disparity", self.__disparity_hover_handler)
 
+    def __draw_map(self, points: NDArray[np.float32]):
+        if self.__mesh_id == -1:
+            return
+
+        print(points[:, :3])
+
+        def callback(mesh: Mesh):
+            mesh.vertices = points
+            mesh.indices = np.arange(points.size // 6, dtype=np.uint32)
+
+        self.__main_gl.update_mesh(self.__mesh_id, callback)
+
     @override
     def start(self) -> None:
         super().start()
@@ -128,7 +148,12 @@ class StereoVslam(BaseExtension):
         self.right_image_subject = Subject()
         self.timestamp_subject = Subject()
 
-        self.__ros_bridge = RosBridge()
+        self.__main_gl = self.context.main_gl
+        if self.__mesh_id != -1:
+            self.__main_gl.remove_mesh(self.__mesh_id)
+        self.__mesh_id = self.__main_gl.new_mesh()
+
+        self.__ros_bridge = RosBridge(self.__draw_map)
         self.__calibrator = Calibrator()
 
         self.stereo_image_observable = reactivex.combine_latest(
@@ -199,6 +224,10 @@ class StereoVslam(BaseExtension):
         if self.__ros_bridge:
             self.__ros_bridge.destroy()
             self.__ros_bridge = None
+
+        if self.__mesh_id != -1:
+            self.__main_gl.remove_mesh(self.__mesh_id)
+        self.__mesh_id = -1
 
         self.__calibrator = None
 
