@@ -114,8 +114,6 @@ void setupCamera() {
   config.jpeg_quality = 12;
   config.fb_count = 1;
   config.fb_location = CAMERA_FB_IN_DRAM;
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {

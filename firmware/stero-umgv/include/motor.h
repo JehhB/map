@@ -5,7 +5,7 @@
 #include "hal/gpio_types.h"
 #include "hal/ledc_types.h"
 
-#define MOTOR_FALLOF_MS 300
+#define MOTOR_FALLOF_MS 3000
 
 typedef struct {
   gpio_num_t pwm;
@@ -27,7 +27,6 @@ const motors_t DEFAULT_MOTORS = {
 esp_err_t motorHandler(httpd_req_t *req);
 void setupMotors(const motors_t &config);
 
-void motorTask(void *params);
 void updateMotor();
 void setMotorL(int8_t speed, const motors_t &config);
 void setMotorR(int8_t speed, const motors_t &config);

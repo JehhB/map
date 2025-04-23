@@ -1,8 +1,9 @@
 #include "motor.h"
-#include "esp32-hal-gpio.h"
+#include "driver/gpio.h"
 #include "esp32-hal-ledc.h"
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include "hal/gpio_types.h"
 #include <Arduino.h>
 #include <cstdint>
 #include <cstdlib>
@@ -71,8 +72,18 @@ esp_err_t motorHandler(httpd_req_t *req) {
 void setupMotor(const motor_config_t &config) {
   ledcSetup(config.ledcChannel, 3000, 8);
   ledcAttachPin(config.pwm, config.ledcChannel);
-  pinMode(config.forward, OUTPUT);
-  pinMode(config.backward, OUTPUT);
+
+  gpio_config_t io_conf = {};
+  io_conf.mode = GPIO_MODE_OUTPUT;
+  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io_conf.intr_type = GPIO_INTR_DISABLE;
+
+  io_conf.pin_bit_mask = (1ULL << config.forward);
+  gpio_config(&io_conf);
+
+  io_conf.pin_bit_mask = (1ULL << config.backward);
+  gpio_config(&io_conf);
 }
 
 void setupMotors(const motors_t &config) {
@@ -82,24 +93,24 @@ void setupMotors(const motors_t &config) {
 
 void setMotorL(int8_t speed, const motors_t &config) {
   if (speed < 0) {
-    ledcWrite(config.left.ledcChannel, -speed * 2);
-    digitalWrite(config.left.forward, LOW);
-    digitalWrite(config.left.backward, HIGH);
+    ledcWrite(config.left.ledcChannel, -speed * 2 - 1);
+    gpio_set_level(config.left.forward, 0);
+    gpio_set_level(config.left.backward, 1);
   } else {
     ledcWrite(config.left.ledcChannel, speed * 2);
-    digitalWrite(config.left.backward, LOW);
-    digitalWrite(config.left.forward, HIGH);
+    gpio_set_level(config.left.backward, 0);
+    gpio_set_level(config.left.forward, 1);
   }
 }
 
 void setMotorR(int8_t speed, const motors_t &config) {
   if (speed < 0) {
-    ledcWrite(config.right.ledcChannel, -speed * 2);
-    digitalWrite(config.right.forward, LOW);
-    digitalWrite(config.right.backward, HIGH);
+    ledcWrite(config.right.ledcChannel, -speed * 2 - 1);
+    gpio_set_level(config.right.forward, 0);
+    gpio_set_level(config.right.backward, 1);
   } else {
     ledcWrite(config.right.ledcChannel, speed * 2);
-    digitalWrite(config.right.backward, LOW);
-    digitalWrite(config.right.forward, HIGH);
+    gpio_set_level(config.right.backward, 0);
+    gpio_set_level(config.right.forward, 1);
   }
 }

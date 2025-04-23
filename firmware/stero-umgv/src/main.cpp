@@ -45,12 +45,14 @@ void setup() {
   Serial.print("WiFi connected, IP: ");
   Serial.println(WiFi.localIP());
 
+  startServer();
+  startStreamServer();
+
+  /*
 #ifdef MOTOR_CONTROLS
   setupMotors(DEFAULT_MOTORS);
 #endif
-
-  startServer();
-  startStreamServer();
+*/
 }
 
 void loop() {
