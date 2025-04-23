@@ -1,9 +1,9 @@
 #include "motor.h"
+#include "esp32-hal-gpio.h"
 #include "esp32-hal-ledc.h"
 #include "esp_err.h"
 #include "esp_http_server.h"
-#include "esp_timer.h"
-#include "freertos/portmacro.h"
+#include <Arduino.h>
 #include <cstdint>
 #include <cstdlib>
 
@@ -19,21 +19,22 @@ motor_state_t globalMotorState = {
     .updated_at = 0,
 };
 
-void motorTask(void *params) {
-  int64_t time;
+void updateMotor() {
+  int64_t time = millis();
 
-  while (1) {
-    time = esp_timer_get_time();
-    if (time - globalMotorState.updated_at < MOTOR_FALLOF_MS * 1000) {
-      setMotorL(globalMotorState.speed_left, DEFAULT_MOTORS);
-      setMotorL(globalMotorState.speed_right, DEFAULT_MOTORS);
-    } else {
-      setMotorL(0, DEFAULT_MOTORS);
-      setMotorR(0, DEFAULT_MOTORS);
-    }
-
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+  if (time - globalMotorState.updated_at < MOTOR_FALLOF_MS) {
+    setMotorL(globalMotorState.speed_left, DEFAULT_MOTORS);
+    setMotorR(globalMotorState.speed_right, DEFAULT_MOTORS);
+  } else {
+    setMotorL(0, DEFAULT_MOTORS);
+    setMotorR(0, DEFAULT_MOTORS);
   }
+
+  /*
+  Serial.printf("Elapsed: %lld\tLeft: %d\tRight: %d\n",
+                time - globalMotorState.updated_at, globalMotorState.speed_left,
+                globalMotorState.speed_right);
+                */
 }
 
 esp_err_t motorHandler(httpd_req_t *req) {
@@ -58,7 +59,7 @@ esp_err_t motorHandler(httpd_req_t *req) {
   }
 
   if (isUpdated) {
-    globalMotorState.updated_at = esp_timer_get_time();
+    globalMotorState.updated_at = millis();
     httpd_resp_sendstr(req, "Updated motor state");
   } else {
     httpd_resp_sendstr(req, "No updates");
@@ -67,34 +68,38 @@ esp_err_t motorHandler(httpd_req_t *req) {
   return ESP_OK;
 }
 
-void setupPwmMotors(const motor_config_t &config) {
+void setupMotor(const motor_config_t &config) {
   ledcSetup(config.ledcChannel, 3000, 8);
-  ledcAttachPin(config.pin, config.ledcChannel);
+  ledcAttachPin(config.pwm, config.ledcChannel);
+  pinMode(config.forward, OUTPUT);
+  pinMode(config.backward, OUTPUT);
 }
 
 void setupMotors(const motors_t &config) {
-  setupPwmMotors(config.rightForward);
-  setupPwmMotors(config.rightBackward);
-  setupPwmMotors(config.leftForward);
-  setupPwmMotors(config.leftBackward);
+  setupMotor(config.left);
+  setupMotor(config.right);
 }
 
 void setMotorL(int8_t speed, const motors_t &config) {
   if (speed < 0) {
-    ledcWrite(config.leftForward.ledcChannel, 0);
-    ledcWrite(config.leftBackward.ledcChannel, -speed * 2);
+    ledcWrite(config.left.ledcChannel, -speed * 2);
+    digitalWrite(config.left.forward, LOW);
+    digitalWrite(config.left.backward, HIGH);
   } else {
-    ledcWrite(config.leftForward.ledcChannel, speed * 2);
-    ledcWrite(config.leftBackward.ledcChannel, 0);
+    ledcWrite(config.left.ledcChannel, speed * 2);
+    digitalWrite(config.left.backward, LOW);
+    digitalWrite(config.left.forward, HIGH);
   }
 }
 
 void setMotorR(int8_t speed, const motors_t &config) {
   if (speed < 0) {
-    ledcWrite(config.rightForward.ledcChannel, 0);
-    ledcWrite(config.rightBackward.ledcChannel, -speed * 2);
+    ledcWrite(config.right.ledcChannel, -speed * 2);
+    digitalWrite(config.right.forward, LOW);
+    digitalWrite(config.right.backward, HIGH);
   } else {
-    ledcWrite(config.rightForward.ledcChannel, speed * 2);
-    ledcWrite(config.rightBackward.ledcChannel, 0);
+    ledcWrite(config.right.ledcChannel, speed * 2);
+    digitalWrite(config.right.backward, LOW);
+    digitalWrite(config.right.forward, HIGH);
   }
 }
