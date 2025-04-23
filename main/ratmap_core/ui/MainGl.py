@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import tkinter as tk
 from threading import RLock
-from typing import Callable, List, Optional, Tuple, final
+from typing import Callable, List, Literal, Optional, Tuple, final
 
 import numpy as np
 from OpenGL import GL
@@ -32,6 +32,7 @@ class MainGl(OpenGLFrame):
         super().__init__(
             master, width=MainGl.DEFAULT_GL_WIDTH, height=MainGl.DEFAULT_GL_HEIGHT
         )
+
         self.__event_target = EventTarget()
         self.shader_program = None
 
@@ -46,18 +47,9 @@ class MainGl(OpenGLFrame):
         # Set up viewport and clear color
         GL.glViewport(0, 0, self.width, self.height)
         GL.glClearColor(0.1, 0.1, 0.1, 1.0)
-        GL.glPointSize(5)
         GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glEnable(GL.GL_PROGRAM_POINT_SIZE)
 
-        """
-        eye = Vector3([0.0, 0.0, 5.0])
-        target = Vector3([0.0, 0.0, 0.0])
-        up = Vector3([0.0, 1.0, 0.0])
-        self.__view_matrix = Matrix44.look_at(eye, target, up, dtype=np.float32)
-        self.__projection_matrix = Matrix44.perspective_projection(
-            45, self.width / self.height, 0.1, 100.0, dtype=np.float32
-        )
-        """
         self.__camera = Camera(Vector3([0.0, 0.0, 5.0]))
 
         # Create shaders and program
@@ -83,7 +75,10 @@ class MainGl(OpenGLFrame):
         
         void main()
         {
-            gl_Position = projection * view * model * vec4(aPos, 1.0);
+            vec4 clipPos = projection * view * model * vec4(aPos, 1.0);
+            gl_Position = clipPos;
+            float ndcDepth = clipPos.z;
+            gl_PointSize = 5 / abs(ndcDepth);
             vertexColor = aColor;
         }
         """
@@ -192,8 +187,13 @@ class MainGl(OpenGLFrame):
             self.__mesh.append(mesh)
             return ret
 
-    def new_mesh(self) -> int:
-        mesh = Mesh()
+    def new_mesh(self, type: Literal["points", "triangles"] = "points") -> int:
+        if type == "triangles":
+            type_int = GL.GL_TRIANGLES
+        else:
+            type_int = GL.GL_POINTS
+
+        mesh = Mesh(type=type_int)
         return self.add_mesh(mesh)
 
     def remove_mesh(self, id: int) -> None:
