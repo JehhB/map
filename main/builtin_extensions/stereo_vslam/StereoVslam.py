@@ -3,14 +3,17 @@ from concurrent.futures import ThreadPoolExecutor
 from tkinter import messagebox
 from typing import Optional, Tuple, Union, final
 
+import cv2
 import numpy as np
 import reactivex
 from cv2.typing import MatLike
+from nav_msgs.msg import OccupancyGrid
 from numpy.typing import NDArray
 from PIL.Image import Image
 from reactivex import Observable, Subject, empty, operators
 from reactivex.abc import DisposableBase
 from reactivex.subject import BehaviorSubject
+from rtabmap_msgs.msg import MapGraph
 from typing_extensions import override
 
 from ratmap_common import AbstractEvent, ExtensionMetadata
@@ -69,7 +72,8 @@ class StereoVslam(BaseExtension):
     __inspect_subject: Subject[Tuple[float, float, float, float]]
 
     __calibration_executor: ThreadPoolExecutor
-    __mesh_id: int
+    __graph_mesh: int
+    __grid_mesh: int
 
     @property
     @override
@@ -88,7 +92,8 @@ class StereoVslam(BaseExtension):
         self.__calibrator = None
         self.__calibration_executor = ThreadPoolExecutor(max_workers=1)
         self.__calibrator_disposer = None
-        self.__mesh_id = -1
+        self.__graph_mesh = -1
+        self.__grid_mesh = -1
 
         self.left_image_subject = None
         self.right_image_subject = None
@@ -128,18 +133,6 @@ class StereoVslam(BaseExtension):
 
         _ = self.add_event_listener("hover.disparity", self.__disparity_hover_handler)
 
-    def __draw_map(self, points: NDArray[np.float32]):
-        if self.__mesh_id == -1:
-            return
-
-        print(points[:, :3])
-
-        def callback(mesh: Mesh):
-            mesh.vertices = points
-            mesh.indices = np.arange(points.size // 6, dtype=np.uint32)
-
-        self.__main_gl.update_mesh(self.__mesh_id, callback)
-
     @override
     def start(self) -> None:
         super().start()
@@ -149,11 +142,20 @@ class StereoVslam(BaseExtension):
         self.timestamp_subject = Subject()
 
         self.__main_gl = self.context.main_gl
-        if self.__mesh_id != -1:
-            self.__main_gl.remove_mesh(self.__mesh_id)
-        self.__mesh_id = self.__main_gl.new_mesh()
 
-        self.__ros_bridge = RosBridge(self.__draw_map)
+        if self.__grid_mesh != -1:
+            self.__main_gl.remove_mesh(self.__grid_mesh)
+        self.__grid_mesh = self.__main_gl.new_mesh("triangles")
+
+        if self.__graph_mesh != -1:
+            self.__main_gl.remove_mesh(self.__graph_mesh)
+        self.__graph_mesh = self.__main_gl.new_mesh("lines")
+        print(self.__grid_mesh, self.__graph_mesh)
+
+        self.__ros_bridge = RosBridge(
+            grid_callback=self.__process_occupancy_grid,
+            map_callback=self.__process_map_graph,
+        )
         self.__calibrator = Calibrator()
 
         self.stereo_image_observable = reactivex.combine_latest(
@@ -225,9 +227,13 @@ class StereoVslam(BaseExtension):
             self.__ros_bridge.destroy()
             self.__ros_bridge = None
 
-        if self.__mesh_id != -1:
-            self.__main_gl.remove_mesh(self.__mesh_id)
-        self.__mesh_id = -1
+        if self.__graph_mesh != -1:
+            self.__main_gl.remove_mesh(self.__graph_mesh)
+        self.__graph_mesh = -1
+
+        if self.__grid_mesh != -1:
+            self.__main_gl.remove_mesh(self.__grid_mesh)
+        self.__grid_mesh = -1
 
         self.__calibrator = None
 
@@ -398,3 +404,138 @@ class StereoVslam(BaseExtension):
     def reset_map(self):
         if self.__ros_bridge:
             self.__ros_bridge.reset()
+
+    def __process_occupancy_grid(self, grid_msg: OccupancyGrid):
+        if self.__grid_mesh == -1:
+            return
+
+        def update(mesh: Mesh):
+            width = grid_msg.info.width
+            height = grid_msg.info.height
+            resolution = grid_msg.info.resolution
+            origin_x = grid_msg.info.origin.position.x
+            origin_y = grid_msg.info.origin.position.y
+
+            # Reshape the data to 2D
+            grid_data = np.array(grid_msg.data, dtype=np.int8).reshape(height, width)
+
+            # Create vertex and index arrays more efficiently
+            vertices = []
+            indices = []
+            vertex_count = 0
+
+            def get_color(occupancy):
+                dark_green = (0.0, 0.5, 0.0)
+                dark_red = (0.5, 0.0, 0.0)
+
+                if occupancy < 20:
+                    return (0.2, 0.2, 0.2)
+                elif occupancy >= 100:
+                    return dark_red
+                elif occupancy <= 20:
+                    return dark_green
+                else:
+                    t = (occupancy - 20) / 80.0
+                    r = dark_green[0] * (1 - t) + dark_red[0] * t
+                    g = dark_green[1] * (1 - t) + dark_red[1] * t
+                    b = dark_green[2] * (1 - t) + dark_red[2] * t
+                    return (r, g, b)
+
+            # Only process non-unknown cells
+            valid_cells = np.where(grid_data >= 0)
+            for y, x in zip(valid_cells[0], valid_cells[1]):
+                occupancy = grid_data[y, x]
+
+                # Calculate world coordinates
+                world_x = origin_x + x * resolution
+                world_y = origin_y + (height - 1 - y) * resolution
+
+                # Get color
+                r, g, b = get_color(occupancy)
+
+                # Add vertices for this cell
+                vertices.extend(
+                    [
+                        [world_x, world_y, -50, r, g, b],
+                        [world_x + resolution, world_y, -50, r, g, b],
+                        [world_x + resolution, world_y + resolution, 25, r, g, b],
+                        [world_x, world_y + resolution, -50, r, g, b],
+                    ]
+                )
+
+                # Add indices (two triangles per quad)
+                indices.extend(
+                    [
+                        vertex_count,
+                        vertex_count + 1,
+                        vertex_count + 2,
+                        vertex_count,
+                        vertex_count + 2,
+                        vertex_count + 3,
+                    ]
+                )
+
+                vertex_count += 4
+
+            # Convert to numpy arrays for better performance
+            mesh.vertices = np.array(vertices, dtype=np.float32)
+            mesh.indices = np.array(indices, dtype=np.uint32)
+
+        self.__main_gl.update_mesh(self.__grid_mesh, update)
+
+    def __process_map_graph(self, graph: MapGraph):
+        if self.__graph_mesh == -1:
+            return
+
+        def draw_graph(mesh: Mesh):
+            vertices = np.array(
+                [
+                    [p.position.x, p.position.z, p.position.y, 0.0, 0.0, 1.0]
+                    for p in graph.poses
+                ],
+                dtype=np.float32,
+            )
+
+            if len(graph.poses) > 0:
+                last_pose = graph.poses[-1]
+
+                qx = last_pose.orientation.x
+                qy = last_pose.orientation.y
+                qz = last_pose.orientation.z
+                qw = last_pose.orientation.w
+
+                x = 2 * (qx * qz + qw * qy)
+                y = 2 * (qy * qz - qw * qx)
+                z = 1 - 2 * (qx * qx + qy * qy)
+
+                magnitude = np.sqrt(x * x + y * y + z * z)
+                scale = 0.25
+
+                # Create a point in the direction the user is facing
+                direction_pose = [
+                    [
+                        last_pose.position.x,
+                        last_pose.position.z,
+                        last_pose.position.y,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                    [
+                        last_pose.position.x + (x / magnitude) * scale,
+                        last_pose.position.z + (z / magnitude) * scale,
+                        last_pose.position.y + (y / magnitude) * scale,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ],
+                ]
+                vertices = np.vstack((vertices, direction_pose), dtype=np.float32)
+
+            mesh.vertices = vertices
+            N = vertices.shape[0]
+            mesh.indices = np.column_stack(
+                (np.arange(N - 1, dtype=np.uint32), np.arange(1, N, dtype=np.uint32))
+            )
+
+        self.__main_gl.update_mesh(self.__graph_mesh, draw_graph)

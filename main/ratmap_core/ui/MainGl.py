@@ -162,6 +162,8 @@ class MainGl(OpenGLFrame):
             # Schedule the next redraw
             _ = self.after(16, self.tkExpose, None)  # ~60 FPS
 
+            GL.glUseProgram(0)
+
     @property
     def event_target(self):
         return self.__event_target
@@ -187,9 +189,18 @@ class MainGl(OpenGLFrame):
             self.__mesh.append(mesh)
             return ret
 
-    def new_mesh(self, type: Literal["points", "triangles"] = "points") -> int:
+    def new_mesh(
+        self,
+        type: Literal["points", "triangles", "lines", "line_strip", "quads"] = "points",
+    ) -> int:
         if type == "triangles":
             type_int = GL.GL_TRIANGLES
+        elif type == "lines":
+            type_int = GL.GL_LINES
+        elif type == "line_strip":
+            type_int = GL.GL_LINE_STRIP
+        elif type == "quads":
+            type_int = GL.GL_QUADS
         else:
             type_int = GL.GL_POINTS
 
@@ -205,10 +216,16 @@ class MainGl(OpenGLFrame):
             return self.__mesh[id]
 
     def update_mesh(self, id: int, callback: Callable[[Mesh], None]) -> None:
+        if id < 0:
+            return
+
         with self.__lock:
-            mesh = self.__mesh[id]
-            if mesh is not None:
-                callback(mesh)
+            try:
+                mesh = self.__mesh[id]
+                if mesh is not None:
+                    callback(mesh)
+            except IndexError:
+                pass
 
     @property
     def camera(self):
@@ -221,18 +238,16 @@ class MainGl(OpenGLFrame):
     def __on_drag(self, event: tk.Event[tk.Misc]):
         mouse_sensitivity = 0.1
 
-        is_panning = isinstance(event.state, int) and event.state & 0x0001
+        is_zooming = isinstance(event.state, int) and event.state & 0x0001
 
         if self.__last_clicked is not None:
             x_offset = event.x - self.__last_clicked[0]
             y_offset = event.y - self.__last_clicked[1]
-            if is_panning:
-                self.__camera.pan(
-                    -x_offset * mouse_sensitivity, y_offset * mouse_sensitivity, 0.5
-                )
+            if is_zooming:
+                self.__camera.zoom = self.__camera.zoom - y_offset * mouse_sensitivity
             else:
-                self.__camera.look_around(
-                    -x_offset * mouse_sensitivity, y_offset * mouse_sensitivity
+                self.__camera.pan(
+                    -x_offset * mouse_sensitivity, -y_offset * mouse_sensitivity, 0.5
                 )
 
         self.__last_clicked = (event.x, event.y)

@@ -8,14 +8,15 @@ import rospy
 import sensor_msgs.point_cloud2 as pc2
 from cv2.typing import MatLike
 from cv_bridge import CvBridge
+from nav_msgs.msg import OccupancyGrid
 from numpy.typing import NDArray
 from PIL.Image import Image
 from reactivex import Observable, operators
 from reactivex.subject import BehaviorSubject
 from rospy import Publisher, ServiceProxy, Subscriber, Time
+from rtabmap_msgs.msg import MapGraph
 from sensor_msgs.msg import CameraInfo as CameraInfoRos
 from sensor_msgs.msg import Image as ImageRos
-from sensor_msgs.msg import PointCloud2
 from std_srvs.srv import Empty
 from stereo_msgs.msg import DisparityImage
 
@@ -31,7 +32,8 @@ class RosBridge(EventTarget):
     right_image_pub: Publisher
     left_camera_info_pub: Publisher
     right_camera_info_pub: Publisher
-    cloud_map_sub: Subscriber
+    occupancy_grid_sub: Subscriber
+    map_graph_sub: Subscriber
 
     disparity_image_sub: Subscriber
     disparity_subject: BehaviorSubject[Optional[DisparityImage]]
@@ -39,10 +41,12 @@ class RosBridge(EventTarget):
     disparity_image_observable: Observable[Optional[MatLike]]
 
     reset_service: ServiceProxy
-    __points_callback: Optional[Callable[[NDArray[np.float32]], None]]
+    reset_odom_service: ServiceProxy
 
     def __init__(
-        self, points_callback: Optional[Callable[[NDArray[np.float32]], None]] = None
+        self,
+        grid_callback: Optional[Callable[[OccupancyGrid], None]] = None,
+        map_callback: Optional[Callable[[MapGraph], None]] = None,
     ):
         super().__init__()
 
@@ -51,7 +55,6 @@ class RosBridge(EventTarget):
 
         rospy.init_node("main_map")
         self.bridge = CvBridge()
-        self.__points_callback = points_callback
 
         self.left_image_pub = Publisher(
             "/stereo_camera/left/image_raw", ImageRos, queue_size=10
@@ -66,8 +69,17 @@ class RosBridge(EventTarget):
             "/stereo_camera/right/camera_info", CameraInfoRos, queue_size=10
         )
 
-        self.cloud_map_sub = Subscriber(
-            "/cloud_map", PointCloud2, self.__process_cloud_map, queue_size=10
+        self.occupancy_grid_sub = Subscriber(
+            "/octomap_grid",
+            OccupancyGrid,
+            lambda grid: grid_callback(grid) if grid_callback is not None else None,
+            queue_size=10,
+        )
+        self.map_graph_sub = Subscriber(
+            "/mapGraph",
+            MapGraph,
+            lambda map: map_callback(map) if map_callback is not None else None,
+            queue_size=10,
         )
 
         self.disparity_subject = BehaviorSubject(None)
@@ -86,6 +98,7 @@ class RosBridge(EventTarget):
         )
 
         self.reset_service = ServiceProxy("/reset", Empty)
+        self.reset_odom_service = ServiceProxy("/reset_odom", Empty)
 
     def __image_to_imgmsg(self, img: Image) -> ImageRos:
         img_np = np.array(img)
@@ -135,35 +148,14 @@ class RosBridge(EventTarget):
         self.left_image_pub.publish(left_image_msg)
         self.right_image_pub.publish(right_image_msg)
 
-    def __process_cloud_map(self, cloud_map: PointCloud2):
-        # Extract points from ROS PointCloud2 message
-
-        _points = pc2.read_points_list(
-            cloud_map, field_names=("x", "y", "z", "rgb"), skip_nans=True
-        )
-        points_array = np.array(_points, dtype=np.float32)
-
-        # Extract xyz and rgb columns
-        xyz = points_array[:, :3]
-        rgb_ints = points_array[:, 3].view(np.uint32)
-
-        r = ((rgb_ints >> 16) & 0xFF) / 255.0
-        g = ((rgb_ints >> 8) & 0xFF) / 255.0
-        b = (rgb_ints & 0xFF) / 255.0
-
-        colors = np.stack([r, g, b], axis=1)
-        points_array = np.hstack([xyz, colors], dtype=np.float32)
-
-        if self.__points_callback is not None:
-            self.__points_callback(points_array)
-
     def destroy(self):
         self.left_image_pub.unregister()
         self.right_image_pub.unregister()
         self.left_camera_info_pub.unregister()
         self.right_camera_info_pub.unregister()
-        self.cloud_map_sub.unregister()
         self.disparity_image_sub.unregister()
+        self.occupancy_grid_sub.unregister()
+        self.map_graph_sub.unregister()
         self.disparity_subject.on_completed()
 
         rospy.signal_shutdown("Don't need anymore")
@@ -217,5 +209,6 @@ class RosBridge(EventTarget):
     def reset(self):
         try:
             self.reset_service()
+            self.reset_odom_service()
         except:
             traceback.print_exc()

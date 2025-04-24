@@ -53,9 +53,9 @@ class MainWindow(tk.Tk):
 
     def __handle_movement(self, event: tk.Event[tk.Misc]):
         if event.char == "w":
-            self.__main_gl.camera.move("forward", delta_time=0.05)
+            self.__main_gl.camera.move("up", delta_time=0.05)
         elif event.char == "s":
-            self.__main_gl.camera.move("backward", delta_time=0.05)
+            self.__main_gl.camera.move("down", delta_time=0.05)
         elif event.char == "a":
             self.__main_gl.camera.move("left", delta_time=0.05)
         elif event.char == "d":
