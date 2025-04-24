@@ -203,13 +203,11 @@ class EurocMavLoader(BaseExtension):
     def __start_mapping(self, _e: AbstractEvent) -> None:
         if self.__player is None:
             return
-        self.stereo_vslam.reset_map()
+
+        self.stereo_vslam.start_mapping()
 
         _ = self.__player.reset()
         _ = self.__player.start()
-
-        if self.stereo_vslam.calibrator is not None:
-            self.stereo_vslam.calibrator.stop()
 
     def __start_calibration(self, _e: AbstractEvent) -> None:
         if self.__player is None:

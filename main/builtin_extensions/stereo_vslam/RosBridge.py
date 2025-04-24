@@ -5,11 +5,9 @@ import cv2
 import numpy as np
 import rosgraph
 import rospy
-import sensor_msgs.point_cloud2 as pc2
 from cv2.typing import MatLike
 from cv_bridge import CvBridge
 from nav_msgs.msg import OccupancyGrid
-from numpy.typing import NDArray
 from PIL.Image import Image
 from reactivex import Observable, operators
 from reactivex.subject import BehaviorSubject
@@ -70,7 +68,7 @@ class RosBridge(EventTarget):
         )
 
         self.occupancy_grid_sub = Subscriber(
-            "/octomap_grid",
+            "/grid_map",
             OccupancyGrid,
             lambda grid: grid_callback(grid) if grid_callback is not None else None,
             queue_size=10,
@@ -208,7 +206,7 @@ class RosBridge(EventTarget):
 
     def reset(self):
         try:
-            self.reset_service()
             self.reset_odom_service()
+            self.reset_service()
         except:
             traceback.print_exc()

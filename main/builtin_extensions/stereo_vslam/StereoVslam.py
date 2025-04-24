@@ -116,21 +116,12 @@ class StereoVslam(BaseExtension):
         )
 
         _ = self.add_event_listener(
-            "click.start_calibration", self.__start_calibration_handler
+            "click.start_calibration", lambda _: self.start_calibration()
         )
 
-        _ = self.add_event_listener(
-            "click.pause_calibration", self.__pause_calibration_handler
-        )
-
-        _ = self.add_event_listener(
-            "click.reset_calibration", self.__reset_calibration_handler
-        )
-
-        _ = self.add_event_listener(
-            "click.update_calibration", self.__update_calibration_handler
-        )
-
+        _ = self.add_event_listener("click.pause_calibration", self.pause_calibration)
+        _ = self.add_event_listener("click.reset_calibration", self.reset_calibration)
+        _ = self.add_event_listener("click.update_calibration", self.update_calibration)
         _ = self.add_event_listener("hover.disparity", self.__disparity_hover_handler)
 
     @override
@@ -334,25 +325,19 @@ class StereoVslam(BaseExtension):
         filename: str = event.detail.additional
         _ = self.save_calibration(filename)
 
-    def __start_calibration_handler(self, _event: AbstractEvent):
-        if self.__calibrator is None:
-            return
-
-        self.__calibrator.start(self.__calibrator_params.getParams())
-
-    def __pause_calibration_handler(self, _event: AbstractEvent):
+    def pause_calibration(self, _event: AbstractEvent):
         if self.__calibrator is None:
             return
 
         self.__calibrator.pause()
 
-    def __reset_calibration_handler(self, _event: AbstractEvent):
+    def reset_calibration(self, _event: AbstractEvent):
         if self.__calibrator is None:
             return
 
         self.__calibrator.reset()
 
-    def __update_calibration_handler(self, _event: AbstractEvent):
+    def update_calibration(self, _event: AbstractEvent):
         if self.__calibrator is None:
             return
 
@@ -539,3 +524,12 @@ class StereoVslam(BaseExtension):
             )
 
         self.__main_gl.update_mesh(self.__graph_mesh, draw_graph)
+
+    @property
+    def calibrator_params(self):
+        return self.__calibrator_params
+
+    def start_mapping(self) -> None:
+        self.reset_map()
+        if self.calibrator is not None:
+            self.calibrator.stop()

@@ -101,7 +101,7 @@ class EurocMavLoaderWindow(tk.Toplevel):
 
         self.__start_calib_button = Button(
             control_frame,
-            text="Start Callibration",
+            text="Start Calibration",
             clickevent="euroc_mav_loader.start_calibration",
         )
         self.__start_calib_button.event_target.parent = self.__event_target

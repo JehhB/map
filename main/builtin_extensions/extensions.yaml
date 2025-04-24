@@ -5,3 +5,7 @@ stereo_vslam:
 euroc_mav_loader:
   module: "euroc_mav_loader"
   instance: "euroc_mav_loader"
+
+stereo_umgv:
+  module: "stereo_umgv"
+  instance: "stereo_umgv"
