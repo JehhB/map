@@ -118,7 +118,6 @@ class Joystick(tk.Canvas):
         Update the visual joystick position based on the current values of x and y subjects.
         """
         # Get current values from subjects
-        print(self)
         norm_x = self.x.value
         norm_y = self.y.value
 

@@ -23,7 +23,6 @@ class StereoUmgvWindow(tk.Toplevel):
     joystick: Joystick
 
     master_ip: BehaviorSubject[str]
-    slave_ip: BehaviorSubject[str]
 
     minimum_samples: int = 5
 
@@ -38,25 +37,15 @@ class StereoUmgvWindow(tk.Toplevel):
         self.title("Ratmap UMGV")
 
         self.master_ip = BehaviorSubject("")
-        self.slave_ip = BehaviorSubject("")
 
         self.__event_target = EventTarget()
 
         url_connection_frame = tk.Frame(self)
 
-        Label(url_connection_frame, text="Right (Main) IP Address").grid(
-            row=0, column=0, sticky="e"
-        )
+        Label(url_connection_frame, text="IP Address").grid(row=0, column=0, sticky="e")
 
         master_entry: Entry = Entry(url_connection_frame, textsubject=self.master_ip)
         master_entry.grid(row=0, column=1, sticky="ew", padx=4)
-
-        Label(url_connection_frame, text="Left (Peripheral) IP Address").grid(
-            row=1, column=0, sticky="e"
-        )
-
-        slave_entry: Entry = Entry(url_connection_frame, textsubject=self.slave_ip)
-        slave_entry.grid(row=1, column=1, sticky="ew", padx=4)
 
         connect_button = Button(
             url_connection_frame, text="Connect", clickevent="stereo_umgv.connect"

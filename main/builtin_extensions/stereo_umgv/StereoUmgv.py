@@ -1,5 +1,6 @@
 import os
 import traceback
+from tkinter import messagebox
 from typing import TYPE_CHECKING, Optional, cast, final
 
 from reactivex import operators
@@ -15,7 +16,7 @@ from .ui import StereoUmgvWindow
 from .UmgvBridge import UmgvBridge
 
 if TYPE_CHECKING:
-    from ..stereo_vslam import Calibrator, StereoVslam
+    from ..stereo_vslam import StereoVslam
 
 
 _EXTENSION_FOLDER = os.path.dirname(os.path.abspath(__file__))
@@ -45,7 +46,7 @@ class StereoUmgv(BaseExtension):
         self.umgv_bridge: UmgvBridge
         self.__extension_window = None
 
-        _ = self.add_event_listener("stereo_umgv.connect", lambda e: print(e))
+        _ = self.add_event_listener("stereo_umgv.connect", self.__connect_handler)
 
         _ = self.add_event_listener(
             "stereo_umgv.start_calibration",
@@ -75,7 +76,10 @@ class StereoUmgv(BaseExtension):
         self.stereo_vslam = cast(
             "StereoVslam", self.extension_manager.get("stereo_vslam")
         )
-        self.umgv_bridge = UmgvBridge()
+
+        self.umgv_bridge = UmgvBridge(
+            self.stereo_vslam.left_image_subject, self.stereo_vslam.right_image_subject
+        )
 
         if not self.stereo_vslam.lock.acquire(True, 0.1):
             raise RuntimeError("Stereo VSLAM Extension currently inuse")
@@ -177,14 +181,10 @@ class StereoUmgv(BaseExtension):
         master_ip: str = self.context.config.get(
             f"{self.config_namespace}.master_ip", default=""
         )
-        slave_ip: str = self.context.config.get(
-            f"{self.config_namespace}.slave_ip", default=""
-        )
 
         def set_configs():
             if self.__extension_window is not None:
                 self.__extension_window.master_ip.on_next(master_ip)
-                self.__extension_window.slave_ip.on_next(slave_ip)
 
         _ = self.__extension_window.after(200, set_configs)
 
@@ -194,3 +194,17 @@ class StereoUmgv(BaseExtension):
 
         self.__extension_window.destroy()
         self.__extension_window = None
+
+    def __connect_handler(self, _e: AbstractEvent):
+        if self.__extension_window is None:
+            return
+
+        ip = self.__extension_window.master_ip.value
+        res = self.umgv_bridge.connect(
+            ip,
+        )
+
+        if not res:
+            _ = messagebox.showerror("Cannot connect", "Cannot connect to robot")
+        else:
+            self.context.config.update(f"{self.config_namespace}.master_ip", ip)
