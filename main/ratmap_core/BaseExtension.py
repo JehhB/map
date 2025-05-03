@@ -37,8 +37,7 @@ class BaseExtension(AbstractExtension, ABC):
     def extension_manager(self, extension_manager: ExtensionManager):
         self.__extension_manager = extension_manager
 
-    @override
-    def start(self) -> None:
+    def ensure_deps(self):
         deps = self.metadata.get("dependency", [])
 
         for dep in deps:
@@ -48,9 +47,10 @@ class BaseExtension(AbstractExtension, ABC):
 
         self.__watch_dependency(deps)
 
+    @override
+    def start(self) -> None:
         super().start()
 
-        id = self.metadata.get("id")
         self.context.config.update(f"{self.config_namespace}.enabled", True)
 
     @override

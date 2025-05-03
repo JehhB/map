@@ -1,14 +1,13 @@
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 from tkinter import messagebox
 from typing import Optional, Tuple, Union, final
 
-import cv2
 import numpy as np
 import reactivex
 from cv2.typing import MatLike
 from nav_msgs.msg import OccupancyGrid
-from numpy.typing import NDArray
 from PIL.Image import Image
 from reactivex import Observable, Subject, empty, operators
 from reactivex.abc import DisposableBase
@@ -63,6 +62,8 @@ class StereoVslam(BaseExtension):
         Observable[Tuple[Optional[Image], Optional[Image], int, bool]]
     ]
 
+    __extension_lock: Lock
+
     __extension_window: Optional[StereoVslamWindow]
     __ros_bridge: Optional[RosBridge]
     __ros_bridge_disposer: Optional[DisposableBase]
@@ -94,6 +95,8 @@ class StereoVslam(BaseExtension):
         self.__calibrator_disposer = None
         self.__graph_mesh = -1
         self.__grid_mesh = -1
+
+        self.__extension_lock = Lock()
 
         self.left_image_subject = None
         self.right_image_subject = None
@@ -533,3 +536,7 @@ class StereoVslam(BaseExtension):
         self.reset_map()
         if self.calibrator is not None:
             self.calibrator.stop()
+
+    @property
+    def extension_lock(self):
+        return self.__extension_lock

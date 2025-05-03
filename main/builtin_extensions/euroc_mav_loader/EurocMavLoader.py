@@ -72,13 +72,13 @@ class EurocMavLoader(BaseExtension):
 
     @override
     def start(self) -> None:
-        super().start()
+        self.ensure_deps()
 
         self.stereo_vslam = cast(
             "StereoVslam", self.extension_manager.get("stereo_vslam")
         )
 
-        if not self.stereo_vslam.lock.acquire(True, 0.1):
+        if not self.stereo_vslam.extension_lock.acquire(True, 0.1):
             raise RuntimeError("Stereo VSLAM Extension currently inuse")
 
         if not self.stereo_vslam.load_calibration(_DEFAULT_CAMERA_INFO):
@@ -88,10 +88,12 @@ class EurocMavLoader(BaseExtension):
             label=EurocMavLoader.LABEL, command=self.__open_window
         )
 
+        super().start()
+
     @override
     def stop(self) -> None:
         try:
-            self.stereo_vslam.lock.release()
+            self.stereo_vslam.extension_lock.release()
         except:
             traceback.print_exc()
 

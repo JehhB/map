@@ -76,7 +76,7 @@ class StereoUmgv(BaseExtension):
 
     @override
     def start(self) -> None:
-        super().start()
+        self.ensure_deps()
 
         self.stereo_vslam = cast(
             "StereoVslam", self.extension_manager.get("stereo_vslam")
@@ -88,7 +88,7 @@ class StereoUmgv(BaseExtension):
             self.stereo_vslam.timestamp_subject,
         )
 
-        if not self.stereo_vslam.lock.acquire(True, 0.1):
+        if not self.stereo_vslam.extension_lock.acquire(True, 0.1):
             raise RuntimeError("Stereo VSLAM Extension currently inuse")
 
         if not self.stereo_vslam.load_calibration(_DEFAULT_CAMERA_INFO):
@@ -106,6 +106,8 @@ class StereoUmgv(BaseExtension):
             "joystick.poll", self.__handle_joystick
         )
 
+        super().start()
+
     def __handle_joystick(self, event: AbstractEvent):
         if not isinstance(event, JoystickEvent):
             return
@@ -117,7 +119,7 @@ class StereoUmgv(BaseExtension):
     @override
     def stop(self) -> None:
         try:
-            self.stereo_vslam.lock.release()
+            self.stereo_vslam.extension_lock.release()
         except:
             traceback.print_exc()
 
