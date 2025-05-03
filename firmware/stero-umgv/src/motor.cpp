@@ -1,9 +1,7 @@
 #include "motor.h"
-#include "driver/gpio.h"
 #include "esp32-hal-ledc.h"
 #include "esp_err.h"
 #include "esp_http_server.h"
-#include "hal/gpio_types.h"
 #include <Arduino.h>
 #include <cstdint>
 #include <cstdlib>
@@ -30,12 +28,13 @@ void updateMotor() {
     setMotorL(0, DEFAULT_MOTORS);
     setMotorR(0, DEFAULT_MOTORS);
   }
+}
 
-  /*
-  Serial.printf("Elapsed: %lld\tLeft: %d\tRight: %d\n",
-                time - globalMotorState.updated_at, globalMotorState.speed_left,
-                globalMotorState.speed_right);
-                */
+void motorTask(void *param) {
+  while (1) {
+    updateMotor();
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
 }
 
 esp_err_t motorHandler(httpd_req_t *req) {
@@ -71,46 +70,32 @@ esp_err_t motorHandler(httpd_req_t *req) {
 
 void setupMotor(const motor_config_t &config) {
   ledcSetup(config.ledcChannel, 3000, 8);
-  ledcAttachPin(config.pwm, config.ledcChannel);
-
-  gpio_config_t io_conf = {};
-  io_conf.mode = GPIO_MODE_OUTPUT;
-  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  io_conf.intr_type = GPIO_INTR_DISABLE;
-
-  io_conf.pin_bit_mask = (1ULL << config.forward);
-  gpio_config(&io_conf);
-
-  io_conf.pin_bit_mask = (1ULL << config.backward);
-  gpio_config(&io_conf);
+  ledcAttachPin(config.pin, config.ledcChannel);
 }
 
 void setupMotors(const motors_t &config) {
-  setupMotor(config.left);
-  setupMotor(config.right);
+  setupMotor(config.left_forward);
+  setupMotor(config.right_forward);
+  setupMotor(config.left_backward);
+  setupMotor(config.right_backward);
 }
 
 void setMotorL(int8_t speed, const motors_t &config) {
   if (speed < 0) {
-    ledcWrite(config.left.ledcChannel, -speed * 2 - 1);
-    gpio_set_level(config.left.forward, 0);
-    gpio_set_level(config.left.backward, 1);
+    ledcWrite(config.left_backward.ledcChannel, -speed * 2 - 1);
+    ledcWrite(config.left_forward.ledcChannel, 0);
   } else {
-    ledcWrite(config.left.ledcChannel, speed * 2);
-    gpio_set_level(config.left.backward, 0);
-    gpio_set_level(config.left.forward, 1);
+    ledcWrite(config.left_forward.ledcChannel, speed * 2 + 1);
+    ledcWrite(config.left_backward.ledcChannel, 0);
   }
 }
 
 void setMotorR(int8_t speed, const motors_t &config) {
   if (speed < 0) {
-    ledcWrite(config.right.ledcChannel, -speed * 2 - 1);
-    gpio_set_level(config.right.forward, 0);
-    gpio_set_level(config.right.backward, 1);
+    ledcWrite(config.right_backward.ledcChannel, -speed * 2 - 1);
+    ledcWrite(config.right_forward.ledcChannel, 0);
   } else {
-    ledcWrite(config.right.ledcChannel, speed * 2);
-    gpio_set_level(config.right.backward, 0);
-    gpio_set_level(config.right.forward, 1);
+    ledcWrite(config.right_forward.ledcChannel, speed * 2 + 1);
+    ledcWrite(config.right_backward.ledcChannel, 0);
   }
 }

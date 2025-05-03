@@ -87,7 +87,7 @@ esp_err_t streamHandler(httpd_req_t *req) {
   return res;
 }
 
-void setupCamera() {
+esp_err_t setupCamera() {
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -107,7 +107,7 @@ void setupCamera() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 16000000;
+  config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_HVGA;
   config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -118,8 +118,10 @@ void setupCamera() {
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     log_e("Camera init failed with error 0x%x", err);
-    return;
+    return err;
   }
+
+  return ESP_OK;
 }
 
 void setupLedFlash(int pin) {

@@ -67,6 +67,11 @@ class StereoUmgv(BaseExtension):
             "stereo_umgv.update_calibration",
             lambda e: self.stereo_vslam.update_calibration(e),
         )
+
+        _ = self.add_event_listener(
+            "stereo_umgv.start_mapping", lambda e: self.stereo_vslam.start_mapping()
+        )
+
         self.__controler_disposable = None
 
     @override
@@ -78,7 +83,9 @@ class StereoUmgv(BaseExtension):
         )
 
         self.umgv_bridge = UmgvBridge(
-            self.stereo_vslam.left_image_subject, self.stereo_vslam.right_image_subject
+            self.stereo_vslam.left_image_subject,
+            self.stereo_vslam.right_image_subject,
+            self.stereo_vslam.timestamp_subject,
         )
 
         if not self.stereo_vslam.lock.acquire(True, 0.1):
@@ -86,6 +93,10 @@ class StereoUmgv(BaseExtension):
 
         if not self.stereo_vslam.load_calibration(_DEFAULT_CAMERA_INFO):
             raise RuntimeError("Stereo VSLAM Extension currently inuse")
+
+        self.stereo_vslam.calibrator_params.square_size.on_next(4.0)
+        self.stereo_vslam.calibrator_params.chessboard_rows.on_next(4)
+        self.stereo_vslam.calibrator_params.chessboard_cols.on_next(6)
 
         self.context.extension_menu.add_command(
             label=StereoUmgv.LABEL, command=self.__open_window
