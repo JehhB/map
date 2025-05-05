@@ -1,5 +1,5 @@
 import tkinter as tk
-from typing import Callable, Optional, Set, Tuple, TypeVar, Union, overload
+from typing import Callable, Optional, Set, TypeVar, Union, overload
 
 from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
@@ -38,9 +38,17 @@ def sync_observable_to_variable(
 ) -> DisposableBase: ...
 
 
+@overload
 def sync_observable_to_variable(
-    observable: Union[Observable[str], Observable[float], Observable[int]],
-    var: Union[tk.StringVar, tk.DoubleVar, tk.IntVar],
+    observable: Observable[bool], var: tk.BooleanVar, master: Optional[tk.Misc]
+) -> DisposableBase: ...
+
+
+def sync_observable_to_variable(
+    observable: Union[
+        Observable[str], Observable[float], Observable[int], Observable[bool]
+    ],
+    var: Union[tk.StringVar, tk.DoubleVar, tk.IntVar, tk.BooleanVar],
     master: Optional[tk.Misc] = None,
 ) -> DisposableBase:
     def update(x: Union[str, float, int]):
@@ -57,8 +65,8 @@ def bind_subject_to_variable(
     subject: Subject[str],
     var: tk.StringVar,
     master: Optional[tk.Misc],
-    on_change: Optional[Callable[[str], None]],
-) -> Tuple[DisposableBase, str]: ...
+    on_change: Optional[Callable[[str], None]] = None,
+) -> DisposableBase: ...
 
 
 @overload
@@ -66,8 +74,8 @@ def bind_subject_to_variable(
     subject: Subject[float],
     var: tk.DoubleVar,
     master: Optional[tk.Misc],
-    on_change: Optional[Callable[[float], None]],
-) -> Tuple[DisposableBase, str]: ...
+    on_change: Optional[Callable[[float], None]] = None,
+) -> DisposableBase: ...
 
 
 @overload
@@ -75,18 +83,32 @@ def bind_subject_to_variable(
     subject: Subject[int],
     var: tk.IntVar,
     master: Optional[tk.Misc],
-    on_change: Optional[Callable[[int], None]],
-) -> Tuple[DisposableBase, str]: ...
+    on_change: Optional[Callable[[int], None]] = None,
+) -> DisposableBase: ...
+
+
+@overload
+def bind_subject_to_variable(
+    subject: Subject[bool],
+    var: tk.BooleanVar,
+    master: Optional[tk.Misc],
+    on_change: Optional[Callable[[bool], None]] = None,
+) -> DisposableBase: ...
 
 
 def bind_subject_to_variable(
-    subject: Union[Subject[str], Subject[float], Subject[int]],
-    var: Union[tk.StringVar, tk.DoubleVar, tk.IntVar],
+    subject: Union[Subject[str], Subject[float], Subject[int], Subject[bool]],
+    var: Union[tk.StringVar, tk.DoubleVar, tk.IntVar, tk.BooleanVar],
     master: Optional[tk.Misc] = None,
     on_change: Optional[
-        Union[Callable[[str], None], Callable[[float], None], Callable[[int], None]]
+        Union[
+            Callable[[str], None],
+            Callable[[float], None],
+            Callable[[int], None],
+            Callable[[bool], None],
+        ]
     ] = None,
-) -> Tuple[DisposableBase, str]:
+) -> DisposableBase:
 
     def _on_change(_a: str, _b: str, _c: str) -> object:
         new_val = var.get()
@@ -98,9 +120,26 @@ def bind_subject_to_variable(
         return None
 
     callback_name = var.trace_add("write", _on_change)
-    disposer = sync_observable_to_variable(subject, var, master)  # type: ignore # pyright: ignore
 
-    return (disposer, callback_name)
+    subject_disposer = sync_observable_to_variable(subject, var, master)  # type: ignore # pyright: ignore
+    callback_disposer = CallbackDisposer(callback_name, var)
+
+    disposer = SetDisposer()
+    disposer.add(subject_disposer)
+    disposer.add(callback_disposer)
+
+    return disposer
+
+
+class CallbackDisposer(DisposableBase):
+    def __init__(self, cbn: str, variable: tk.Variable) -> None:
+        super().__init__()
+        self.__cbn = cbn
+        self.__variable = variable
+
+    @override
+    def dispose(self) -> None:
+        self.__variable.trace_remove("write", self.__cbn)
 
 
 class SetDisposer(DisposableBase):

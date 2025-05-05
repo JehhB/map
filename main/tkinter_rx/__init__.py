@@ -1,5 +1,4 @@
 from tkinter.ttk import (
-    Checkbutton,
     Combobox,
     Frame,
     LabeledScale,
@@ -16,6 +15,7 @@ from tkinter.ttk import (
 )
 
 from .Button import Button, ButtonEvent
+from .Checkbutton import Checkbutton, CheckbuttonEvent
 from .Entry import Entry, EntryEvent
 from .ImageLabel import ImageLabel
 from .Label import Label, LabelEvent
@@ -30,6 +30,7 @@ __all__ = [
     "Button",
     "ButtonEvent",
     "Checkbutton",
+    "CheckbuttonEvent",
     "Combobox",
     "Entry",
     "EntryEvent",

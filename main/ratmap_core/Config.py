@@ -29,7 +29,7 @@ class Config:
 
         self.__load()
 
-        self.__save_disposer = self.__config.pipe(operators.debounce(5)).subscribe(
+        self.__save_disposer = self.__config.pipe(operators.debounce(1)).subscribe(
             self.__save
         )
 

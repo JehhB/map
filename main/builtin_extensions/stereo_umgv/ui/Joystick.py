@@ -39,6 +39,7 @@ class Joystick(tk.Canvas):
             **kwargs: Additional arguments to pass to the Canvas constructor
         """
         super().__init__(parent, width=size, height=size)
+
         self.size = size
         self.radius = size // 2
         self.stick_radius = size // 6

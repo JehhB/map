@@ -23,7 +23,6 @@ class Spinbox(ttk.Spinbox):
 
     __value_subject: Optional[Subject[float]]
     __value_disposer: Optional[DisposableBase]
-    __value_write_cbn: Optional[str]
 
     __state_observable: Optional[Observable[Literal["normal", "readonly", "disabled"]]]
     __state_disposer: Optional[DisposableBase]
@@ -56,7 +55,6 @@ class Spinbox(ttk.Spinbox):
         _ = self.configure(textvariable=variable)
 
         self.__value_disposer = None
-        self.__value_write_cbn = None
         self.__state_disposer = None
 
         self.__value_subject = None
@@ -99,7 +97,7 @@ class Spinbox(ttk.Spinbox):
             )
             self.__event_target.emit(event)
 
-        (self.__value_disposer, self.__value_write_cbn) = bind_subject_to_variable(
+        self.__value_disposer = bind_subject_to_variable(
             subject, self.__text_variable, self, on_change_callback
         )
 
@@ -108,10 +106,6 @@ class Spinbox(ttk.Spinbox):
         if self.__value_disposer is not None:
             self.__value_disposer.dispose()
             self.__value_disposer = None
-
-        if self.__value_write_cbn is not None:
-            self.__text_variable.trace_remove("write", self.__value_write_cbn)
-            self.__value_write_cbn = None
 
         self.__value_subject = None
 

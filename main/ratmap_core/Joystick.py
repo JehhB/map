@@ -7,7 +7,7 @@ import pygame
 from pygame import joystick
 from typing_extensions import override
 
-from ratmap_common import AbstractEvent, EventTarget
+from ratmap_common import EventTarget
 from ratmap_common.BaseEvent import BaseEvent
 
 

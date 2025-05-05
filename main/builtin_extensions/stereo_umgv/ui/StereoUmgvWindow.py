@@ -3,14 +3,26 @@ from typing import Optional, Union
 
 from cv2.typing import MatLike
 from PIL.Image import Image
-from reactivex import Observable, Subject
+from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
 from reactivex.subject import BehaviorSubject
 from typing_extensions import override
 
 from ratmap_common.EventTarget import EventTarget
-from tkinter_rx import Button, Entry, ImageLabel, Label, LabelFrame, Spinbox
+from tkinter_rx import (
+    Button,
+    Checkbutton,
+    Entry,
+    ImageLabel,
+    Label,
+    LabelFrame,
+    Radiobutton,
+    Scale,
+    Spinbox,
+)
+from tkinter_rx.util import bind_subject_to_variable
 
+from ..ImageTransformer import ImageTransformer
 from .Joystick import Joystick
 
 
@@ -22,7 +34,8 @@ class StereoUmgvWindow(tk.Toplevel):
     __right_image: ImageLabel
     joystick: Joystick
 
-    master_ip: BehaviorSubject[str]
+    right_ip: BehaviorSubject[str]
+    left_ip: BehaviorSubject[str]
 
     minimum_samples: int = 5
 
@@ -31,21 +44,35 @@ class StereoUmgvWindow(tk.Toplevel):
         master: tk.Misc,
         x_subject: BehaviorSubject[float],
         y_subject: BehaviorSubject[float],
+        scaler: Subject[float],
+        motor_controler: Subject[str],
+        right_transformer: ImageTransformer,
+        left_transformer: ImageTransformer,
     ) -> None:
         super().__init__(master)
 
         self.title("Ratmap UMGV")
 
-        self.master_ip = BehaviorSubject("")
+        self.right_ip = BehaviorSubject("")
+        self.left_ip = BehaviorSubject("")
 
         self.__event_target = EventTarget()
 
         url_connection_frame = tk.Frame(self)
 
-        Label(url_connection_frame, text="IP Address").grid(row=0, column=0, sticky="e")
+        Label(url_connection_frame, text="Right IP Address").grid(
+            row=0, column=0, sticky="e"
+        )
 
-        master_entry: Entry = Entry(url_connection_frame, textsubject=self.master_ip)
-        master_entry.grid(row=0, column=1, sticky="ew", padx=4)
+        right_entry: Entry = Entry(url_connection_frame, textsubject=self.right_ip)
+        right_entry.grid(row=0, column=1, sticky="ew", padx=4)
+
+        Label(url_connection_frame, text="Left IP Address").grid(
+            row=1, column=0, sticky="e"
+        )
+
+        left_entry: Entry = Entry(url_connection_frame, textsubject=self.left_ip)
+        left_entry.grid(row=1, column=1, sticky="ew", padx=4)
 
         connect_button = Button(
             url_connection_frame, text="Connect", clickevent="stereo_umgv.connect"
@@ -58,13 +85,63 @@ class StereoUmgvWindow(tk.Toplevel):
 
         preview_frame = tk.Frame(self)
 
+        image_transform_frame = tk.Frame(preview_frame)
+
+        Checkbutton(
+            image_transform_frame,
+            text="Flip vertically",
+            valuesubject=left_transformer.flipV,
+        ).pack(padx=4, side=tk.RIGHT)
+        Checkbutton(
+            image_transform_frame,
+            text="Flip horizontally",
+            valuesubject=left_transformer.flipH,
+        ).pack(padx=4, side=tk.RIGHT)
+        Button(
+            image_transform_frame,
+            text="Rotate CCW",
+            command=lambda: left_transformer.rotate(3),
+        ).pack(padx=4, side=tk.LEFT)
+        Button(
+            image_transform_frame,
+            text="Rotate CW",
+            command=lambda: left_transformer.rotate(1),
+        ).pack(padx=4, side=tk.LEFT)
+
+        image_transform_frame.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
+
         self.__left_image = ImageLabel(
             preview_frame,
             width=StereoUmgvWindow.DEFAULT_VIEWER_WIDTH,
             height=StereoUmgvWindow.DEFAULT_VIEWER_HEIGHT,
             bg="black",
         )
-        self.__left_image.grid(row=0, column=0, padx=4, pady=4)
+        self.__left_image.grid(row=1, column=0, padx=4, pady=4)
+
+        image_transform_frame = tk.Frame(preview_frame)
+
+        Checkbutton(
+            image_transform_frame,
+            text="Flip vertically",
+            valuesubject=right_transformer.flipV,
+        ).pack(padx=4, side=tk.RIGHT)
+        Checkbutton(
+            image_transform_frame,
+            text="Flip horizontally",
+            valuesubject=right_transformer.flipH,
+        ).pack(padx=4, side=tk.RIGHT)
+        Button(
+            image_transform_frame,
+            text="Rotate CCW",
+            command=lambda: right_transformer.rotate(3),
+        ).pack(padx=4, side=tk.LEFT)
+        Button(
+            image_transform_frame,
+            text="Rotate CW",
+            command=lambda: right_transformer.rotate(1),
+        ).pack(padx=4, side=tk.LEFT)
+
+        image_transform_frame.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
 
         self.__right_image = ImageLabel(
             preview_frame,
@@ -72,7 +149,7 @@ class StereoUmgvWindow(tk.Toplevel):
             height=StereoUmgvWindow.DEFAULT_VIEWER_HEIGHT,
             bg="black",
         )
-        self.__right_image.grid(row=0, column=1, padx=4, pady=4)
+        self.__right_image.grid(row=1, column=1, padx=4, pady=4)
 
         _ = preview_frame.rowconfigure(0, weight=1)
         _ = preview_frame.columnconfigure((0, 1), weight=1)
@@ -80,10 +157,41 @@ class StereoUmgvWindow(tk.Toplevel):
 
         control_frame = tk.Frame(self)
 
-        joystick_frame = LabelFrame(control_frame, text="Joystick")
+        joystick_frame = LabelFrame(control_frame, text="Control")
 
         self.joystick = Joystick(joystick_frame, x_subject, y_subject, 150)
-        self.joystick.pack(anchor="center")
+        self.joystick.grid(row=0, column=0, padx=4, pady=4, rowspan=7)
+
+        scaler_label = scaler.pipe(operators.map(lambda x: "Speed scaler (%.2f)" % x))
+
+        Label(joystick_frame, textobservable=scaler_label).grid(
+            row=1, column=1, padx=4, columnspan=2, sticky="w"
+        )
+
+        Scale(joystick_frame, valuesubject=scaler, from_=0.0, to=1.0).grid(
+            row=2, column=1, padx=4, columnspan=2, sticky="ew"
+        )
+
+        Label(joystick_frame, text="Controller select").grid(
+            row=4, column=1, padx=4, columnspan=2, sticky="w"
+        )
+
+        variable = tk.StringVar(self, "right")
+        self.__control_disposer = bind_subject_to_variable(
+            motor_controler, variable, self
+        )
+
+        Radiobutton(
+            joystick_frame, text="Right", value="right", variable=variable
+        ).grid(row=5, column=1, padx=4, sticky="w")
+
+        Radiobutton(joystick_frame, text="Left", value="left", variable=variable).grid(
+            row=5, column=2, padx=4, sticky="w"
+        )
+
+        _ = joystick_frame.rowconfigure((0, 6), weight=2)
+        _ = joystick_frame.rowconfigure(3, weight=1)
+        _ = joystick_frame.columnconfigure((1, 2), weight=1)
         joystick_frame.grid(row=0, column=0, sticky="ew", padx=4, ipadx=4, ipady=8)
 
         calibration_frame = LabelFrame(control_frame, text="Calibration")
@@ -210,6 +318,7 @@ class StereoUmgvWindow(tk.Toplevel):
         del self.calibration_count_observable
         del self.is_calibrating_observable
         self.__event_target.dispose()
+        self.__control_disposer.dispose()
         return super().destroy()
 
     @property

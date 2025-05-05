@@ -273,9 +273,35 @@ class FrameKwargs(TypedDict, total=False):
     width: ScreenUnits
 
 
+class BaseCheckbuttonKwargs(TypedDict, total=False):
+    class_: str
+    command: ButtonCommand
+    compound: TtkCompound
+    cursor: Cursor
+    image: ImageSpec
+    name: str
+    padding: Any
+    state: Literal["normal", "disabled"]
+    style: str
+    takefocus: TakeFocusValue
+    text: float | str
+    underline: int
+    width: int | Literal[""]
+
+
+class CheckbuttonKwargs(BaseCheckbuttonKwargs, total=False):
+    textvariable: tkinter.StringVar
+    textobservable: Observable[str]
+    variable: tkinter.BooleanVar
+    valuesubject: Subject[bool]
+    stateobservable: Observable[Literal["normal", "disabled"]]
+    changeevent: str
+
+
 __all__ = [
     "Anchor",
     "BaseButtonKwargs",
+    "BaseCheckbuttonKwargs",
     "BaseEntryKwargs",
     "BaseImageLabelKwargs",
     "BaseLabelKwargs",
@@ -283,11 +309,13 @@ __all__ = [
     "BaseSpinboxKwargs",
     "ButtonCommand",
     "ButtonKwargs",
+    "CheckbuttonKwargs",
     "Compound",
     "Cursor",
     "EntryKwargs",
     "EntryValidateCommand",
     "FontDescription",
+    "FrameKwargs",
     "Image",
     "ImageLabelKwargs",
     "ImageSpec",
@@ -301,5 +329,4 @@ __all__ = [
     "TakeFocusValue",
     "TtkCompound",
     "XYScrollCommand",
-    "FrameKwargs",
 ]

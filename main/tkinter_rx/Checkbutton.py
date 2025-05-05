@@ -1,60 +1,70 @@
-from __future__ import annotations
-
 import tkinter as tk
-from tkinter import DoubleVar, ttk
+from tkinter import ttk
 from typing import Literal, Optional, cast
 
 from reactivex import Observable, Subject, operators
 from reactivex.abc import DisposableBase
-from typing_extensions import Unpack, override
+from typing_extensions import Unpack
 
 from ratmap_common import EventTarget
+from tkinter_rx.util import (
+    bind_subject_to_variable,
+    safe_callback,
+    sync_observable_to_variable,
+)
 
 from .TkinterEvent import TkinterEvent, TkinterEventDetail
-from .typing import BaseScaleKwargs, ScaleKwargs
-from .util import bind_subject_to_variable, safe_callback
+from .typing import BaseCheckbuttonKwargs, CheckbuttonKwargs
 
 
-class ScaleEvent(TkinterEvent):
+class CheckbuttonEvent(TkinterEvent):
     pass
 
 
-class Scale(ttk.Scale):
+class Checkbutton(ttk.Checkbutton):
+    __text_variable: tk.StringVar
+    __text_observable: Optional[Observable[str]]
+    __text_disposer: Optional[DisposableBase]
+
+    __value_subject: Optional[Subject[bool]]
+    __value_disposer: Optional[DisposableBase]
+
     __state_observable: Optional[Observable[Literal["normal", "disabled"]]]
     __state_disposer: Optional[DisposableBase]
 
-    __variable: tk.DoubleVar
-    __value_subject: Optional[Subject[float]]
-    __value_disposer: Optional[DisposableBase]
-
-    __focus_cbn: str
-    __blur_cbn: str
-
     __event_target: EventTarget
-
     __change_event: str
-    __focus_event: str
-    __blur_event: str
 
     def __init__(
         self,
         master: Optional[tk.Misc] = None,
-        **kwargs: Unpack[ScaleKwargs],
+        **kwargs: Unpack[CheckbuttonKwargs],
     ) -> None:
         kwargs = kwargs.copy()
 
+        text_variable = kwargs.pop("textvariable", None)
+        text_observable = kwargs.pop("textobservable", None)
         variable = kwargs.pop("variable", None)
         value_subject = kwargs.pop("valuesubject", None)
         state_observable = kwargs.pop("stateobservable", None)
         self.__change_event = kwargs.pop("changeevent", "change")
-        self.__focus_event = kwargs.pop("focusevent", "focus")
-        self.__blur_event = kwargs.pop("blurevent", "blur")
 
-        super().__init__(master, **cast(BaseScaleKwargs, kwargs))
+        super().__init__(
+            master, **cast(BaseCheckbuttonKwargs, kwargs), onvalue=True, offvalue=False
+        )
+
+        if text_variable is None:
+            text = None if "text" not in kwargs else str(kwargs.pop("text"))
+            text_variable = tk.StringVar(self, text)
+        self.__text_variable = text_variable
+        _ = self.configure(textvariable=text_variable)
+
+        self.__text_observable = None
+        self.__text_disposer = None
+        self.text_observable = text_observable
 
         if variable is None:
-            value = kwargs.pop("value", 0.0)
-            variable = DoubleVar(self, value)
+            variable = tk.BooleanVar(self)
         self.__variable = variable
         _ = self.configure(variable=variable)
 
@@ -64,38 +74,21 @@ class Scale(ttk.Scale):
         self.__value_subject = None
         self.__state_observable = None
 
-        if value_subject is None:
-            value_subject = cast(Subject[float], Subject())
-        self.value_subject = value_subject
-
         self.value_subject = value_subject
         self.state_observable = state_observable
 
         self.__event_target = EventTarget()
-
-        self.__focus_cbn = self.bind(
-            "<FocusIn>",
-            lambda e: self.__event_target.emit(
-                ScaleEvent(self.__focus_event, detail=e), self
-            ),
-        )
-        self.__blur_cbn = self.bind(
-            "<FocusOut>",
-            lambda e: self.__event_target.emit(
-                ScaleEvent(self.__blur_event, detail=e), self
-            ),
-        )
 
     @property
     def event_target(self):
         return self.__event_target
 
     @property
-    def value_subject(self) -> Optional[Subject[float]]:
+    def value_subject(self) -> Optional[Subject[bool]]:
         return self.__value_subject
 
     @value_subject.setter
-    def value_subject(self, subject: Optional[Subject[float]]):
+    def value_subject(self, subject: Optional[Subject[bool]]):
         del self.value_subject
 
         self.__value_subject = subject
@@ -103,8 +96,8 @@ class Scale(ttk.Scale):
         if subject is None:
             return
 
-        def on_change_callback(new_val: float):
-            event = ScaleEvent(
+        def on_change_callback(new_val: bool):
+            event = CheckbuttonEvent(
                 self.__change_event, detail=TkinterEventDetail(self, new_val)
             )
             self.__event_target.emit(event)
@@ -136,7 +129,7 @@ class Scale(ttk.Scale):
 
         self.__state_observable = observable
 
-        def update_state(new_state: Literal["normal", "disabled"]):
+        def update_state(new_state: Literal["normal", "readonly", "disabled"]):
             _ = self.config(state=new_state)
 
         if observable is None:
@@ -154,13 +147,26 @@ class Scale(ttk.Scale):
             self.__state_disposer = None
         self.__state_observable = None
 
-    @override
-    def destroy(self) -> None:
-        del self.value_subject
-        del self.state_observable
+    @property
+    def text_observable(self) -> Optional[Observable[str]]:
+        return self.__text_observable
 
-        self.unbind("<FocusIn>", self.__focus_cbn)
-        self.unbind("<FocusOut>", self.__blur_cbn)
+    @text_observable.setter
+    def text_observable(self, text_observable: Optional[Observable[str]]):
+        del self.text_observable
 
-        self.__event_target.dispose()
-        return super().destroy()
+        self.__text_observable = text_observable
+
+        if text_observable is None:
+            return
+
+        self.__text_disposer = sync_observable_to_variable(
+            text_observable, self.__text_variable, self
+        )
+
+    @text_observable.deleter
+    def text_observable(self):
+        if self.__text_disposer is not None:
+            self.__text_disposer.dispose()
+            self.__text_disposer = None
+        self.__text_observable = None

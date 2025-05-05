@@ -24,7 +24,6 @@ class Entry(ttk.Entry):
     __text_variable: tk.StringVar
     __text_subject: Optional[Subject[str]]
     __text_disposer: Optional[DisposableBase]
-    __text_write_cbn: Optional[str]
 
     __focus_cbn: str
     __blur_cbn: str
@@ -45,7 +44,6 @@ class Entry(ttk.Entry):
 
         self.__text_subject = None
         self.__text_disposer = None
-        self.__text_write_cbn = None
 
         text_variable = kwargs.pop("textvariable", None)
         text_subject = kwargs.pop("textsubject", None)
@@ -139,7 +137,7 @@ class Entry(ttk.Entry):
             )
             self.__event_target.emit(event)
 
-        (self.__text_disposer, self.__text_write_cbn) = bind_subject_to_variable(
+        self.__text_disposer = bind_subject_to_variable(
             subject, self.__text_variable, self, on_change_callback
         )
 
@@ -148,10 +146,6 @@ class Entry(ttk.Entry):
         if self.__text_disposer is not None:
             self.__text_disposer.dispose()
             self.__text_disposer = None
-
-        if self.__text_write_cbn is not None:
-            self.__text_variable.trace_remove("write", self.__text_write_cbn)
-            self.__text_write_cbn = None
 
         self.__text_subject = None
 
