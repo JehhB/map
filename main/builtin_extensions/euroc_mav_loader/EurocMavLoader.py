@@ -206,16 +206,18 @@ class EurocMavLoader(BaseExtension):
         if self.__player is None:
             return
 
-        self.stereo_vslam.start_mapping()
-
         _ = self.__player.reset()
         _ = self.__player.start()
+
+        self.stereo_vslam.start_mapping()
 
     def __start_calibration(self, _e: AbstractEvent) -> None:
         if self.__player is None:
             return
 
-        self.__start_mapping(_e)
+        _ = self.__player.reset()
+        _ = self.__player.start()
+
         self.stereo_vslam.start_calibration(
             {"chessboard_size": (7, 6), "square_size": 6.0}
         )

@@ -12,9 +12,13 @@
        <remap from="odom" to="/stereo_odometry"/>
 
        <param name="frame_id"        type="string" value="base_footprint"/>
+       <param name="subscribe_stereo" type="bool" value="true"/>
+       <param name="subscribe_depth"  type="bool" value="false"/>
        <param name="subscribe_rgbd"  type="bool" value="false"/>
+       <param name="publish_null_when_lost" value="false"/>
 
-       <param name="Odom/Strategy"      type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
+       <param name="Odom/Strategy"      type="string" value="1"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
+       <param name="Odom/ResetCountdown" value="1"/>
        <param name="Vis/EstimationType" type="string" value="1"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
        <param name="Vis/MaxDepth"       type="string" value="0"/>
        <param name="Odom/GuessMotion" type="string" value="true"/>
@@ -29,6 +33,7 @@
        <param name="subscribe_stereo" type="bool" value="true"/>
        <param name="subscribe_depth"  type="bool" value="false"/>
        <param name="subscribe_rgbd"      type="bool" value="false"/>
+       <param name="use_action_for_goal" type="bool" value="true"/>
 
        <remap from="left/image_rect"   to="/stereo_camera/left/image_rect_color"/>
        <remap from="right/image_rect"  to="/stereo_camera/right/image_rect"/>
@@ -46,12 +51,13 @@
        <param name="Grid/3D"                           type="string" value="false"/>
        <param name="Grid/Sensor"                       type="string" value="1"/>
        <param name="Grid/DepthDecimation"              type="string" value="2"/>
-       <param name="Grid/FlatObstacleDetected"         type="string" value="false"/>
+       <param name="Grid/FlatObstacleDetected"         type="string" value="true"/>
        <param name="Kp/MaxDepth"                       type="string" value="0"/>
        <param name="Kp/DetectorStrategy"               type="string" value="6"/>
        <param name="Vis/EstimationType"                type="string" value="1"/>   <!-- 0=3D->3D, 1=3D->2D (PnP) -->
        <param name="Vis/MaxDepth"                      type="string" value="0"/>
        <param name="Grid/RayTracing"                   type="string" value="true"/>
        <param name="RGBD/CreateOccupancyGrid"          type="string" value="true"/>
+
     </node>
 </launch>

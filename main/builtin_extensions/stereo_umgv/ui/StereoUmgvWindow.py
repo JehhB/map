@@ -15,8 +15,8 @@ from .Joystick import Joystick
 
 
 class StereoUmgvWindow(tk.Toplevel):
-    DEFAULT_VIEWER_WIDTH: int = 320
-    DEFAULT_VIEWER_HEIGHT: int = 480
+    DEFAULT_VIEWER_WIDTH: int = 480
+    DEFAULT_VIEWER_HEIGHT: int = 320
 
     __left_image: ImageLabel
     __right_image: ImageLabel

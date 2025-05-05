@@ -102,6 +102,7 @@ class StereoVslam(BaseExtension):
         self.right_image_subject = None
         self.timestamp_subject = None
         self.stereo_image_observable = None
+        self.is_mapping = BehaviorSubject(False)
 
         self.__calibrator_params = CalibratorParamsHolder()
         self.__inspect_subject = Subject()
@@ -134,6 +135,7 @@ class StereoVslam(BaseExtension):
         self.left_image_subject = Subject()
         self.right_image_subject = Subject()
         self.timestamp_subject = Subject()
+        self.is_mapping.on_next(False)
 
         self.__main_gl = self.context.main_gl
 
@@ -144,7 +146,6 @@ class StereoVslam(BaseExtension):
         if self.__graph_mesh != -1:
             self.__main_gl.remove_mesh(self.__graph_mesh)
         self.__graph_mesh = self.__main_gl.new_mesh("lines")
-        print(self.__grid_mesh, self.__graph_mesh)
 
         self.__ros_bridge = RosBridge(
             grid_callback=self.__process_occupancy_grid,
@@ -166,7 +167,9 @@ class StereoVslam(BaseExtension):
 
         safe_dispose(self.__ros_bridge_disposer)
         self.__ros_bridge_disposer = reactivex.combine_latest(
-            self.stereo_image_observable, self.__calibrator.stereo_camera_info
+            self.stereo_image_observable,
+            self.__calibrator.stereo_camera_info,
+            self.is_mapping,
         ).subscribe(on_next=self.process_images)
 
         self.context.extension_menu.add_command(
@@ -178,9 +181,13 @@ class StereoVslam(BaseExtension):
         images: Tuple[
             Tuple[Optional[Image], Optional[Image], int, bool],
             Optional[StereoCameraInfo],
+            bool,
         ],
     ):
-        stereo_images, camera_info = images
+        stereo_images, camera_info, is_mapping = images
+        if not is_mapping:
+            return
+
         left_image, right_image, _timestamp, is_calibrating = stereo_images
 
         if (
@@ -216,6 +223,8 @@ class StereoVslam(BaseExtension):
 
         safe_dispose(self.__ros_bridge_disposer)
         self.__ros_bridge_disposer = None
+
+        self.is_mapping.on_next(False)
 
         if self.__ros_bridge:
             self.__ros_bridge.destroy()
@@ -388,6 +397,7 @@ class StereoVslam(BaseExtension):
             self.__calibrator_params.square_size.on_next(params["square_size"])
         if self.__calibrator:
             self.__calibrator.start(self.__calibrator_params.getParams())
+        self.is_mapping.on_next(False)
 
     def reset_map(self):
         if self.__ros_bridge:
@@ -412,22 +422,15 @@ class StereoVslam(BaseExtension):
             indices = []
             vertex_count = 0
 
-            def get_color(occupancy):
-                dark_green = (0.0, 0.5, 0.0)
-                dark_red = (0.5, 0.0, 0.0)
-
-                if occupancy < 20:
-                    return (0.2, 0.2, 0.2)
-                elif occupancy >= 100:
-                    return dark_red
-                elif occupancy <= 20:
-                    return dark_green
+            def get_color(occupancy: int):
+                if occupancy == 0:
+                    return (0.8, 0.8, 0.8)
+                elif occupancy == -1:
+                    return (0.0, 0.0, 0.0)
+                elif occupancy == 100:
+                    return (0.8, 0.2, 0.2)
                 else:
-                    t = (occupancy - 20) / 80.0
-                    r = dark_green[0] * (1 - t) + dark_red[0] * t
-                    g = dark_green[1] * (1 - t) + dark_red[1] * t
-                    b = dark_green[2] * (1 - t) + dark_red[2] * t
-                    return (r, g, b)
+                    return (0, 0, 0.5)
 
             # Only process non-unknown cells
             valid_cells = np.where(grid_data >= 0)
@@ -436,7 +439,7 @@ class StereoVslam(BaseExtension):
 
                 # Calculate world coordinates
                 world_x = origin_x + x * resolution
-                world_y = origin_y + (height - 1 - y) * resolution
+                world_y = origin_y + y * resolution
 
                 # Get color
                 r, g, b = get_color(occupancy)
@@ -536,6 +539,7 @@ class StereoVslam(BaseExtension):
         self.reset_map()
         if self.calibrator is not None:
             self.calibrator.stop()
+        self.is_mapping.on_next(True)
 
     @property
     def extension_lock(self):
