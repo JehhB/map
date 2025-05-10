@@ -176,6 +176,8 @@ class StereoVslam(BaseExtension):
             label=StereoVslam.LABEL, command=self.__open_window
         )
 
+        self.context.edit_menu.add_command(label="reset map", command=self.reset_map)
+
     def process_images(
         self,
         images: Tuple[
@@ -242,6 +244,7 @@ class StereoVslam(BaseExtension):
 
         self.__close_window()
         _ = self.context.extension_menu.remove(label=StereoVslam.LABEL)
+        _ = self.context.edit_menu.remove(label="reset map")
 
     def __close_window(self):
         if self.__extension_window is None:
@@ -481,7 +484,7 @@ class StereoVslam(BaseExtension):
         def draw_graph(mesh: Mesh):
             vertices = np.array(
                 [
-                    [p.position.x, p.position.z, p.position.y, 0.0, 0.0, 1.0]
+                    [p.position.x, p.position.y, p.position.z, 0.0, 0.0, 1.0]
                     for p in graph.poses
                 ],
                 dtype=np.float32,
@@ -506,16 +509,16 @@ class StereoVslam(BaseExtension):
                 direction_pose = [
                     [
                         last_pose.position.x,
-                        last_pose.position.z,
                         last_pose.position.y,
+                        last_pose.position.z,
                         0.0,
                         1.0,
                         0.0,
                     ],
                     [
                         last_pose.position.x + (x / magnitude) * scale,
-                        last_pose.position.z + (z / magnitude) * scale,
                         last_pose.position.y + (y / magnitude) * scale,
+                        last_pose.position.z + (z / magnitude) * scale,
                         0.0,
                         1.0,
                         0.0,
