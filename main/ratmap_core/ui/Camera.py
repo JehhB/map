@@ -1,8 +1,8 @@
 import math
-from typing import Literal, Optional
+from typing import Literal, Optional, Tuple
 
 import numpy as np
-from pyrr import Matrix44, Vector3
+from pyrr import Matrix44, Vector3, Vector4
 from typing_extensions import TypeAlias
 
 CameraMovement: TypeAlias = Literal[
@@ -143,3 +143,55 @@ class Camera:
         self.up = (
             self.right * -sin_r + self.front.cross(self.right) * cos_r
         ).normalized
+
+    def get_world_position(self, xy: Tuple[float, float]) -> Tuple[float, float]:
+        """
+        Convert screen coordinates to world coordinates at the XY plane (z=0).
+
+        Args:
+            xy: Tuple[float, float] - Screen coordinates where [0,0] is top-left
+                and [1,1] is bottom-right
+
+        Returns:
+            Tuple[float, float] - World coordinates (x, y) at the XY plane
+        """
+        # Normalize screen coordinates to NDC space (-1 to 1)
+        x_ndc = 2.0 * xy[0] - 1.0
+        # Flip y-axis since screen coordinates are top-down
+        y_ndc = 1.0 - 2.0 * xy[1]
+
+        # Create ray in NDC space
+        ndc_near = Vector4([x_ndc, y_ndc, -1.0, 1.0], dtype=np.float32)
+        ndc_far = Vector4([x_ndc, y_ndc, 1.0, 1.0], dtype=np.float32)
+
+        # Get inverse of projection-view matrix
+        inv_proj_view = (self.projection_matrix * self.view_matrix).inverse
+
+        # Transform to world space
+        world_near = inv_proj_view * ndc_near
+        world_far = inv_proj_view * ndc_far
+
+        # Perspective division
+        if abs(world_near.w) > 1e-6:
+            world_near = world_near / world_near.w
+        if abs(world_far.w) > 1e-6:
+            world_far = world_far / world_far.w
+
+        # Create ray direction
+        ray_origin = Vector3([world_near.x, world_near.y, world_near.z])
+        ray_target = Vector3([world_far.x, world_far.y, world_far.z])
+        ray_direction = (ray_target - ray_origin).normalized
+
+        # Intersect with XY plane (z=0)
+        # If ray is parallel to XY plane, return None
+        if abs(ray_direction.z) < 1e-6:
+            # Return camera position projected to XY plane as fallback
+            return (self.position.x, self.position.y)
+
+        # Calculate distance to intersection
+        t = -ray_origin.z / ray_direction.z
+
+        # Calculate intersection point
+        intersection = ray_origin + ray_direction * t
+
+        return (float(intersection.x), float(intersection.y))

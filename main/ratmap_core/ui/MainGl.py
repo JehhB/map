@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import math
 import tkinter as tk
 from threading import RLock
 from typing import Callable, List, Literal, Optional, Tuple, final
 
-import numpy as np
 from OpenGL import GL
 from pyopengltk import OpenGLFrame
-from pyrr import Matrix44, Vector3
+from pyrr import Vector3
 from typing_extensions import override
 
 from ratmap_common.EventTarget import EventTarget
+from tkinter_rx.TkinterEvent import TkinterEvent
 
 from .Camera import Camera
 from .Mesh import Mesh
@@ -58,6 +57,18 @@ class MainGl(OpenGLFrame):
         _ = self.bind("<Configure>", self.__handle_resize)
         _ = self.bind("<B1-Motion>", self.__on_drag)
         _ = self.bind("<ButtonRelease-1>", self.__release_hold)
+
+        _ = self.bind(
+            "<Button-1>",
+            lambda e: self.event_target.emit(TkinterEvent("main_gl.click", self, e)),
+        )
+
+        _ = self.bind(
+            "<Double-Button-1>",
+            lambda e: self.event_target.emit(
+                TkinterEvent("main_gl.double_click", self, e)
+            ),
+        )
 
     def create_shader_program(self):
         # Vertex Shader source code - using GLSL 1.30

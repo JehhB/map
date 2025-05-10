@@ -1,8 +1,9 @@
+import math
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from tkinter import messagebox
-from typing import Optional, Tuple, Union, final
+from typing import List, Optional, Tuple, Union, cast, final
 
 import numpy as np
 import reactivex
@@ -21,7 +22,7 @@ from ratmap_core.ui import MainGl
 from ratmap_core.ui.Mesh import Mesh
 from tkinter_rx import MenuEvent
 from tkinter_rx.Label import LabelEvent
-from tkinter_rx.TkinterEvent import TkinterEventDetail
+from tkinter_rx.TkinterEvent import TkinterEvent, TkinterEventDetail
 from tkinter_rx.util import safe_dispose
 
 from .Calibrator import Calibrator, CalibratorParams
@@ -71,10 +72,12 @@ class StereoVslam(BaseExtension):
     __calibrator_params: CalibratorParamsHolder
     __calibrator_disposer: Optional[DisposableBase]
     __inspect_subject: Subject[Tuple[float, float, float, float]]
+    __maingl_click_disposer: Optional[DisposableBase]
 
     __calibration_executor: ThreadPoolExecutor
     __graph_mesh: int
     __grid_mesh: int
+    __target_mesh: int
 
     @property
     @override
@@ -95,6 +98,8 @@ class StereoVslam(BaseExtension):
         self.__calibrator_disposer = None
         self.__graph_mesh = -1
         self.__grid_mesh = -1
+        self.__target_mesh = -1
+        self.__maingl_click_disposer = None
 
         self.__extension_lock = Lock()
 
@@ -143,6 +148,10 @@ class StereoVslam(BaseExtension):
             self.__main_gl.remove_mesh(self.__grid_mesh)
         self.__grid_mesh = self.__main_gl.new_mesh("triangles")
 
+        if self.__target_mesh != -1:
+            self.__main_gl.remove_mesh(self.__target_mesh)
+        self.__target_mesh = self.__main_gl.new_mesh("triangles")
+
         if self.__graph_mesh != -1:
             self.__main_gl.remove_mesh(self.__graph_mesh)
         self.__graph_mesh = self.__main_gl.new_mesh("lines")
@@ -176,7 +185,11 @@ class StereoVslam(BaseExtension):
             label=StereoVslam.LABEL, command=self.__open_window
         )
 
-        self.context.edit_menu.add_command(label="reset map", command=self.reset_map)
+        self.context.edit_menu.add_command(label="Reset map", command=self.reset_map)
+
+        self.__maingl_click_disposer = self.__main_gl.event_target.add_event_listener(
+            "main_gl.double_click", self.__add_target
+        )
 
     def process_images(
         self,
@@ -226,6 +239,9 @@ class StereoVslam(BaseExtension):
         safe_dispose(self.__ros_bridge_disposer)
         self.__ros_bridge_disposer = None
 
+        safe_dispose(self.__maingl_click_disposer)
+        self.__maingl_click_disposer = None
+
         self.is_mapping.on_next(False)
 
         if self.__ros_bridge:
@@ -240,11 +256,15 @@ class StereoVslam(BaseExtension):
             self.__main_gl.remove_mesh(self.__grid_mesh)
         self.__grid_mesh = -1
 
+        if self.__target_mesh != -1:
+            self.__main_gl.remove_mesh(self.__target_mesh)
+        self.__target_mesh = -1
+
         self.__calibrator = None
 
         self.__close_window()
         _ = self.context.extension_menu.remove(label=StereoVslam.LABEL)
-        _ = self.context.edit_menu.remove(label="reset map")
+        _ = self.context.edit_menu.remove(label="Reset map")
 
     def __close_window(self):
         if self.__extension_window is None:
@@ -547,3 +567,45 @@ class StereoVslam(BaseExtension):
     @property
     def extension_lock(self):
         return self.__extension_lock
+
+    def __add_target(self, event: AbstractEvent):
+        if not isinstance(event, TkinterEvent):
+            return
+
+        detail = event.detail
+        target = event.target
+
+        if not isinstance(detail, tk.Event) or not isinstance(target, MainGl):
+            return
+
+        x = detail.x / cast(int, target.width)
+        y = detail.y / cast(int, target.height)
+
+        res = self.__main_gl.camera.get_world_position((x, y))
+
+        def update_target(mesh: Mesh):
+            color = [0.2, 0.8, 0.8]
+            vertices: List[List[float]] = []
+            vertices.append([res[0], res[1], 0.0, *color])
+
+            segments = 8
+            r = 0.1
+
+            # Add perimeter vertices
+            for i in range(segments):
+                angle = 2.0 * math.pi * i / segments
+                vx = res[0] + r * math.cos(angle)
+                vy = res[1] + r * math.sin(angle)
+                vertices.append([vx, vy, 0.0, *color])
+
+            # Create indices for triangle fan
+            indices: List[int] = []
+            for i in range(1, segments + 1):
+                indices.append(0)  # Center vertex
+                indices.append(i)  # Current perimeter vertex
+                indices.append(1 if i == segments else i + 1)  # Next perimeter vertex
+
+            mesh.vertices = np.array(vertices, dtype=np.float32)
+            mesh.indices = np.array(indices, dtype=np.uint32)
+
+        self.__main_gl.update_mesh(self.__target_mesh, update_target)
