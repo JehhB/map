@@ -115,8 +115,8 @@ class StereoUmgv(BaseExtension):
             )
         )
         self.__transform_disposable.add(
-            self.__right_transformer.transformer_observable.subscribe(
-                self.umgv_bridge.right_transform
+            self.__left_transformer.transformer_observable.subscribe(
+                self.umgv_bridge.left_transform
             )
         )
 

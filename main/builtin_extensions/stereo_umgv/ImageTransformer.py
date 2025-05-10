@@ -54,13 +54,12 @@ class ImageTransformer(DisposableBase):
                 elif rotate == 3:
                     image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-                if flipV:
+                if flipV and flipH:
+                    image = cv2.flip(image, -1)
+                elif flipV:
                     image = cv2.flip(image, 0)
-
-                if flipH:
+                elif flipH:
                     image = cv2.flip(image, 1)
-
-                image = cv2.resize(image, (480, 320))
 
                 return image
 
