@@ -2,6 +2,7 @@
     <!-- Launch stereo_image_proc with a namespace -->
     <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc" ns="stereo_camera" />
     <node pkg="tf" type="static_transform_publisher" name="camera_link_transformer" args="0 0 0 0 0 0 base_footprint stereo_camera 100"/>
+    <node pkg="tf" type="static_transform_publisher" name="base_link_transformer" args="0 0 0 0 0 0 odom base_footprint 100"/>
 
     <node pkg="rtabmap_odom" type="stereo_odometry" name="stereo_odometry" output="screen">
        <remap from="left/image_rect"       to="/stereo_camera/left/image_rect_color"/>

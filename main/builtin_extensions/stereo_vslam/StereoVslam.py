@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple, Union, cast, final
 import numpy as np
 import reactivex
 from cv2.typing import MatLike
+from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid
 from PIL.Image import Image
 from reactivex import Observable, Subject, empty, operators
@@ -77,7 +78,8 @@ class StereoVslam(BaseExtension):
     __calibration_executor: ThreadPoolExecutor
     __graph_mesh: int
     __grid_mesh: int
-    __target_mesh: int
+    __set_target_mesh: int
+    __out_target_mesh: int
 
     @property
     @override
@@ -98,7 +100,8 @@ class StereoVslam(BaseExtension):
         self.__calibrator_disposer = None
         self.__graph_mesh = -1
         self.__grid_mesh = -1
-        self.__target_mesh = -1
+        self.__set_target_mesh = -1
+        self.__out_target_mesh = -1
         self.__maingl_click_disposer = None
 
         self.__extension_lock = Lock()
@@ -148,9 +151,13 @@ class StereoVslam(BaseExtension):
             self.__main_gl.remove_mesh(self.__grid_mesh)
         self.__grid_mesh = self.__main_gl.new_mesh("triangles")
 
-        if self.__target_mesh != -1:
-            self.__main_gl.remove_mesh(self.__target_mesh)
-        self.__target_mesh = self.__main_gl.new_mesh("triangles")
+        if self.__set_target_mesh != -1:
+            self.__main_gl.remove_mesh(self.__set_target_mesh)
+        self.__set_target_mesh = self.__main_gl.new_mesh("triangles")
+
+        if self.__out_target_mesh != -1:
+            self.__main_gl.remove_mesh(self.__out_target_mesh)
+        self.__out_target_mesh = self.__main_gl.new_mesh("triangles")
 
         if self.__graph_mesh != -1:
             self.__main_gl.remove_mesh(self.__graph_mesh)
@@ -159,6 +166,7 @@ class StereoVslam(BaseExtension):
         self.__ros_bridge = RosBridge(
             grid_callback=self.__process_occupancy_grid,
             map_callback=self.__process_map_graph,
+            target_callback=self.__process_target,
         )
         self.__calibrator = Calibrator()
 
@@ -256,9 +264,13 @@ class StereoVslam(BaseExtension):
             self.__main_gl.remove_mesh(self.__grid_mesh)
         self.__grid_mesh = -1
 
-        if self.__target_mesh != -1:
-            self.__main_gl.remove_mesh(self.__target_mesh)
-        self.__target_mesh = -1
+        if self.__set_target_mesh != -1:
+            self.__main_gl.remove_mesh(self.__set_target_mesh)
+        self.__set_target_mesh = -1
+
+        if self.__out_target_mesh != -1:
+            self.__main_gl.remove_mesh(self.__out_target_mesh)
+        self.__out_target_mesh = -1
 
         self.__calibrator = None
 
@@ -569,7 +581,7 @@ class StereoVslam(BaseExtension):
         return self.__extension_lock
 
     def __add_target(self, event: AbstractEvent):
-        if not isinstance(event, TkinterEvent):
+        if not isinstance(event, TkinterEvent) or self.__ros_bridge is None:
             return
 
         detail = event.detail
@@ -608,4 +620,35 @@ class StereoVslam(BaseExtension):
             mesh.vertices = np.array(vertices, dtype=np.float32)
             mesh.indices = np.array(indices, dtype=np.uint32)
 
-        self.__main_gl.update_mesh(self.__target_mesh, update_target)
+        self.__main_gl.update_mesh(self.__set_target_mesh, update_target)
+        self.__ros_bridge.set_target(res[0], res[1], 0)
+
+    def __process_target(self, pose: PoseStamped):
+        res = (pose.pose.position.x, pose.pose.position.y)
+
+        def update_target(mesh: Mesh):
+            color = [0.2, 0.8, 0.2]
+            vertices: List[List[float]] = []
+            vertices.append([res[0], res[1], 0.0, *color])
+
+            segments = 8
+            r = 0.15
+
+            # Add perimeter vertices
+            for i in range(segments):
+                angle = 2.0 * math.pi * i / segments
+                vx = res[0] + r * math.cos(angle)
+                vy = res[1] + r * math.sin(angle)
+                vertices.append([vx, vy, 0.2, *color])
+
+            # Create indices for triangle fan
+            indices: List[int] = []
+            for i in range(1, segments + 1):
+                indices.append(0)  # Center vertex
+                indices.append(i)  # Current perimeter vertex
+                indices.append(1 if i == segments else i + 1)  # Next perimeter vertex
+
+            mesh.vertices = np.array(vertices, dtype=np.float32)
+            mesh.indices = np.array(indices, dtype=np.uint32)
+
+        self.__main_gl.update_mesh(self.__out_target_mesh, update_target)

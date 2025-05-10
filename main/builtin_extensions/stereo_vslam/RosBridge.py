@@ -7,6 +7,7 @@ import rosgraph
 import rospy
 from cv2.typing import MatLike
 from cv_bridge import CvBridge
+from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid
 from PIL.Image import Image
 from reactivex import Observable, operators
@@ -30,8 +31,10 @@ class RosBridge(EventTarget):
     right_image_pub: Publisher
     left_camera_info_pub: Publisher
     right_camera_info_pub: Publisher
+    target_pub: Publisher
     occupancy_grid_sub: Subscriber
     map_graph_sub: Subscriber
+    target_sub: Subscriber
 
     disparity_image_sub: Subscriber
     disparity_subject: BehaviorSubject[Optional[DisparityImage]]
@@ -45,6 +48,7 @@ class RosBridge(EventTarget):
         self,
         grid_callback: Optional[Callable[[OccupancyGrid], None]] = None,
         map_callback: Optional[Callable[[MapGraph], None]] = None,
+        target_callback: Optional[Callable[[PoseStamped], None]] = None,
     ):
         super().__init__()
 
@@ -66,6 +70,7 @@ class RosBridge(EventTarget):
         self.right_camera_info_pub = Publisher(
             "/stereo_camera/right/camera_info", CameraInfoRos, queue_size=10
         )
+        self.target_pub = Publisher("/goal", PoseStamped, queue_size=10)
 
         self.occupancy_grid_sub = Subscriber(
             "/grid_map",
@@ -78,6 +83,13 @@ class RosBridge(EventTarget):
             MapGraph,
             lambda map: map_callback(map) if map_callback is not None else None,
             queue_size=10,
+        )
+        self.target_sub = Subscriber(
+            "/goal_out",
+            PoseStamped,
+            lambda target: (
+                target_callback(target) if target_callback is not None else None
+            ),
         )
 
         self.disparity_subject = BehaviorSubject(None)
@@ -151,9 +163,11 @@ class RosBridge(EventTarget):
         self.right_image_pub.unregister()
         self.left_camera_info_pub.unregister()
         self.right_camera_info_pub.unregister()
+        self.target_pub.unregister()
         self.disparity_image_sub.unregister()
         self.occupancy_grid_sub.unregister()
         self.map_graph_sub.unregister()
+        self.target_sub.unregister()
         self.disparity_subject.on_completed()
 
         rospy.signal_shutdown("Don't need anymore")
@@ -210,3 +224,12 @@ class RosBridge(EventTarget):
             self.reset_service()
         except:
             traceback.print_exc()
+
+    def set_target(self, x: float, y: float, z: float):
+        target = PoseStamped()
+        target.header.frame_id = "map"
+        target.header.stamp = Time.now()
+        target.pose.position.x = x
+        target.pose.position.y = y
+        target.pose.position.z = z
+        self.target_pub.publish(target)
