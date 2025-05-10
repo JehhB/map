@@ -7,8 +7,8 @@
 #include <WiFi.h>
 #include <cstddef>
 
-const char *ssid = "hotspot?";
-const char *password = "12345678";
+const char *ssid = "RatmapAP";
+const char *password = "Ratmap19";
 
 esp_err_t ok_handler(httpd_req_t *req) {
   const char *resp_str = "ok";
