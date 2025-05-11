@@ -48,6 +48,7 @@ class MainGl(OpenGLFrame):
         GL.glClearColor(0.1, 0.1, 0.1, 1.0)
         GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glEnable(GL.GL_PROGRAM_POINT_SIZE)
+        GL.glLineWidth(2)
 
         self.__camera = Camera(Vector3([0.0, 0.0, 5.0]))
 

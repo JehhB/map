@@ -9,7 +9,7 @@ import numpy as np
 import reactivex
 from cv2.typing import MatLike
 from geometry_msgs.msg import PoseStamped
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Path
 from PIL.Image import Image
 from reactivex import Observable, Subject, empty, operators
 from reactivex.abc import DisposableBase
@@ -77,6 +77,7 @@ class StereoVslam(BaseExtension):
 
     __calibration_executor: ThreadPoolExecutor
     __graph_mesh: int
+    __plan_mesh: int
     __grid_mesh: int
     __set_target_mesh: int
     __out_target_mesh: int
@@ -99,6 +100,7 @@ class StereoVslam(BaseExtension):
         self.__calibration_executor = ThreadPoolExecutor(max_workers=1)
         self.__calibrator_disposer = None
         self.__graph_mesh = -1
+        self.__plan_mesh = -1
         self.__grid_mesh = -1
         self.__set_target_mesh = -1
         self.__out_target_mesh = -1
@@ -163,10 +165,15 @@ class StereoVslam(BaseExtension):
             self.__main_gl.remove_mesh(self.__graph_mesh)
         self.__graph_mesh = self.__main_gl.new_mesh("lines")
 
+        if self.__plan_mesh != -1:
+            self.__main_gl.remove_mesh(self.__plan_mesh)
+        self.__plan_mesh = self.__main_gl.new_mesh("lines")
+
         self.__ros_bridge = RosBridge(
             grid_callback=self.__process_occupancy_grid,
             map_callback=self.__process_map_graph,
             target_callback=self.__process_target,
+            plan_callback=self.__process_plan,
         )
         self.__calibrator = Calibrator()
 
@@ -259,6 +266,10 @@ class StereoVslam(BaseExtension):
         if self.__graph_mesh != -1:
             self.__main_gl.remove_mesh(self.__graph_mesh)
         self.__graph_mesh = -1
+
+        if self.__plan_mesh != -1:
+            self.__main_gl.remove_mesh(self.__plan_mesh)
+        self.__plan_mesh = -1
 
         if self.__grid_mesh != -1:
             self.__main_gl.remove_mesh(self.__grid_mesh)
@@ -524,39 +535,45 @@ class StereoVslam(BaseExtension):
 
             if len(graph.poses) > 0:
                 last_pose = graph.poses[-1]
-
                 qx = last_pose.orientation.x
                 qy = last_pose.orientation.y
                 qz = last_pose.orientation.z
                 qw = last_pose.orientation.w
 
-                x = 2 * (qx * qz + qw * qy)
-                y = 2 * (qy * qz - qw * qx)
-                z = 1 - 2 * (qx * qx + qy * qy)
+                # Calculate forward vector (x-axis direction in local frame)
+                forward_x = 1 - 2 * (qy * qy + qz * qz)
+                forward_y = 2 * (qx * qy + qw * qz)
+                forward_z = 2 * (qx * qz - qw * qy)
 
-                magnitude = np.sqrt(x * x + y * y + z * z)
-                scale = 0.25
+                # Project onto x-y plane by zeroing z component
+                forward_z = 0
 
-                # Create a point in the direction the user is facing
-                direction_pose = [
-                    [
-                        last_pose.position.x,
-                        last_pose.position.y,
-                        last_pose.position.z,
-                        0.0,
-                        1.0,
-                        0.0,
-                    ],
-                    [
-                        last_pose.position.x + (x / magnitude) * scale,
-                        last_pose.position.y + (y / magnitude) * scale,
-                        last_pose.position.z + (z / magnitude) * scale,
-                        0.0,
-                        1.0,
-                        0.0,
-                    ],
-                ]
-                vertices = np.vstack((vertices, direction_pose), dtype=np.float32)
+                # Recalculate magnitude after projection
+                magnitude = np.sqrt(forward_x * forward_x + forward_y * forward_y)
+
+                # Avoid division by zero
+                if magnitude > 0.0001:
+                    scale = 0.25
+                    # Create a point in the direction the user is facing along x-y plane
+                    direction_pose = [
+                        [
+                            last_pose.position.x,
+                            last_pose.position.y,
+                            last_pose.position.z,
+                            1.0,
+                            1.0,
+                            0.0,
+                        ],
+                        [
+                            last_pose.position.x + (forward_x / magnitude) * scale,
+                            last_pose.position.y + (forward_y / magnitude) * scale,
+                            last_pose.position.z,  # Keep same z to stay in x-y plane
+                            1.0,
+                            1.0,
+                            0.0,
+                        ],
+                    ]
+                    vertices = np.vstack((vertices, direction_pose), dtype=np.float32)
 
             mesh.vertices = vertices
             N = vertices.shape[0]
@@ -581,6 +598,9 @@ class StereoVslam(BaseExtension):
         return self.__extension_lock
 
     def __add_target(self, event: AbstractEvent):
+        if self.__set_target_mesh == -1:
+            return
+
         if not isinstance(event, TkinterEvent) or self.__ros_bridge is None:
             return
 
@@ -624,6 +644,9 @@ class StereoVslam(BaseExtension):
         self.__ros_bridge.set_target(res[0], res[1], 0)
 
     def __process_target(self, pose: PoseStamped):
+        if self.__out_target_mesh == -1:
+            return
+
         res = (pose.pose.position.x, pose.pose.position.y)
 
         def update_target(mesh: Mesh):
@@ -652,3 +675,36 @@ class StereoVslam(BaseExtension):
             mesh.indices = np.array(indices, dtype=np.uint32)
 
         self.__main_gl.update_mesh(self.__out_target_mesh, update_target)
+
+    def __process_plan(self, plan: Path):
+        if self.__plan_mesh == -1:
+            return
+
+        def draw_plan(mesh: Mesh):
+            if plan.poses is None:
+                mesh.vertices = np.array([], dtype=np.float32)
+                mesh.indices = np.array([], dtype=np.uint32)
+                return
+
+            vertices = np.array(
+                [
+                    [
+                        p.pose.position.x,
+                        p.pose.position.y,
+                        p.pose.position.z,
+                        0.0,
+                        1.0,
+                        0.0,
+                    ]
+                    for p in plan.poses
+                ],
+                dtype=np.float32,
+            )
+
+            mesh.vertices = vertices
+            N = vertices.shape[0]
+            mesh.indices = np.column_stack(
+                (np.arange(N - 1, dtype=np.uint32), np.arange(1, N, dtype=np.uint32))
+            )
+
+        self.__main_gl.update_mesh(self.__plan_mesh, draw_plan)
