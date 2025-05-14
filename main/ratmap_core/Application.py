@@ -2,7 +2,7 @@ from typing import Optional
 
 from ratmap_common import AbstractEvent, EventTarget
 from tkinter_rx import Menu
-from tkinter_rx.util import SetDisposer
+from tkinter_rx.util import SetDisposer, disposable_bind
 
 from .Config import Config
 from .ExtensionManager import ExtensionManager
@@ -13,7 +13,6 @@ from .ui import (
     ManageExtensionsWindow,
     MenuEdit,
     MenuExtension,
-    MenuFile,
     MenuMain,
     MenuNavigate,
 )
@@ -27,7 +26,6 @@ class Application(EventTarget):
     __joystick: Joystick
 
     __main_menu: MenuMain
-    __file_menu: MenuFile
     __extension_menu: MenuExtension
     __edit_menu: MenuEdit
     __navigate_menu: MenuNavigate
@@ -45,7 +43,6 @@ class Application(EventTarget):
 
         self.__main_menu = self.__main_window.main_menu
         self.__edit_menu = self.__main_menu.edit_menu
-        self.__file_menu = self.__main_menu.file_menu
         self.__navigate_menu = self.__main_menu.navigate_menu
         self.__extension_menu = self.__main_menu.extension_menu
 
@@ -64,6 +61,43 @@ class Application(EventTarget):
 
         self.__disposer.add(
             self.__joystick.add_event_listener("joystick.poll", self.__handle_movement)
+        )
+
+        zoom_sensitivity = 2.0
+
+        def zoom(val: float):
+            self.__main_gl.camera.zoom = self.__main_gl.camera.zoom + val
+
+        def reset_zoom():
+            self.__main_gl.camera.zoom = 10.0
+
+        def recenter():
+            self.__main_gl.camera.position[0] = 0.0
+            self.__main_gl.camera.position[1] = 0.0
+
+        self.__disposer.add(
+            self.add_event_listener(
+                "activate.menu_main.navigate.zoom_in", lambda e: zoom(-zoom_sensitivity)
+            ),
+            self.add_event_listener(
+                "activate.menu_main.navigate.zoom_out", lambda e: zoom(zoom_sensitivity)
+            ),
+            self.add_event_listener(
+                "activate.menu_main.navigate.zoom_reset", lambda e: reset_zoom()
+            ),
+            self.add_event_listener(
+                "activate.menu_main.navigate.recenter", lambda e: recenter()
+            ),
+            disposable_bind(
+                self.main_window, "<Control-plus>", lambda e: zoom(-zoom_sensitivity)
+            ),
+            disposable_bind(
+                self.main_window, "<Control-minus>", lambda e: zoom(zoom_sensitivity)
+            ),
+            disposable_bind(
+                self.main_window, "<Control-equal>", lambda e: reset_zoom()
+            ),
+            disposable_bind(self.main_window, "<Control-0>", lambda e: recenter()),
         )
 
     def close_window(self):
@@ -112,10 +146,6 @@ class Application(EventTarget):
     @property
     def main_menu(self) -> Menu:
         return self.__main_menu
-
-    @property
-    def file_menu(self) -> Menu:
-        return self.__file_menu
 
     @property
     def edit_menu(self) -> Menu:

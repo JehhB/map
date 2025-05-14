@@ -12,10 +12,7 @@ class MenuNavigate(Menu):
         self.add_command(label="Zoom -", command=self.navigate_zoom_out)
         self.add_command(label="Reset Zoom", command=self.navigate_zoom_reset)
         self.add_separator()
-        self.add_command(label="Reorient", command=self.navigate_reorient)
         self.add_command(label="Recenter", command=self.navigate_recenter)
-        self.add_separator()
-        self.add_command(label="Fit to view", command=self.navigate_fit_view)
 
         menu_bar.add_cascade(label="Navigate", menu=self)
 
@@ -28,11 +25,5 @@ class MenuNavigate(Menu):
     def navigate_zoom_reset(self):
         self.emit(MenuEvent.factory(self, "menu_main", "navigate", "zoom_reset"))
 
-    def navigate_reorient(self):
-        self.emit(MenuEvent.factory(self, "menu_main", "navigate", "reorient"))
-
     def navigate_recenter(self):
         self.emit(MenuEvent.factory(self, "menu_main", "navigate", "recenter"))
-
-    def navigate_fit_view(self):
-        self.emit(MenuEvent.factory(self, "menu_main", "navigate", "fit_view"))

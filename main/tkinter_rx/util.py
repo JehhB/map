@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import tkinter as tk
 from typing import Callable, Optional, Set, TypeVar, Union, overload
 
@@ -131,6 +133,24 @@ def bind_subject_to_variable(
     return disposer
 
 
+class __DisposableBind(DisposableBase):
+    def __init__(self, widget: tk.Misc, seq: str, cbn: str) -> None:
+        self.__widget = widget
+        self.__cbn = cbn
+        self.__seq = seq
+
+    @override
+    def dispose(self) -> None:
+        self.__widget.unbind(self.__seq, self.__cbn)
+
+
+def disposable_bind(
+    widget: tk.Misc, seq: str, func: Callable[[tk.Event[tk.Misc]], object]
+):
+    cbn = widget.bind(seq, func)
+    return __DisposableBind(widget, seq, cbn)
+
+
 class CallbackDisposer(DisposableBase):
     def __init__(self, cbn: str, variable: tk.Variable) -> None:
         super().__init__()
@@ -155,8 +175,9 @@ class SetDisposer(DisposableBase):
             disposer.dispose()
         self.__disposers = set()
 
-    def add(self, disposable: DisposableBase):
-        self.__disposers.add(disposable)
+    def add(self, *disposables: DisposableBase):
+        for d in disposables:
+            self.__disposers.add(d)
 
 
 def safe_dispose(disposable: Optional[DisposableBase]):
