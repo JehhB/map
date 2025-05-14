@@ -219,7 +219,7 @@ class EurocMavLoader(BaseExtension):
         _ = self.__player.start()
 
         self.stereo_vslam.start_calibration(
-            {"chessboard_size": (7, 6), "square_size": 6.0}
+            {"chessboard_size": (6, 7), "square_size": 6.0}
         )
 
     def __set_fps(self, ev: AbstractEvent) -> None:

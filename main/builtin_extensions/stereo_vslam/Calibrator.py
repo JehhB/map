@@ -196,6 +196,9 @@ class Calibrator:
             None,  # pyright: ignore[reportArgumentType]
             None,  # pyright: ignore[reportArgumentType]
         )
+
+        KL, _ = cv2.getOptimalNewCameraMatrix(KL, DL, self.img_shape[::-1], 0)
+
         print("calibrated left camera")
 
         ret_right, KR, DR, _rvecs_right, _tvecs_right = (
@@ -207,6 +210,9 @@ class Calibrator:
                 None,  # pyright: ignore[reportArgumentType]
             )
         )
+
+        KR, _ = cv2.getOptimalNewCameraMatrix(KR, DR, self.img_shape[::-1], 0)
+
         print("calibrated right camera")
 
         ret, K1, D1, K2, D2, R, T, E, F = cv2.stereoCalibrate(
