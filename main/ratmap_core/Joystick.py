@@ -122,8 +122,7 @@ class Joystick(EventTarget[JoystickEvent]):
         if len(detail.axes) >= 6:
 
             detail.left_stick = (detail.axes[0], detail.axes[1])
-
-            detail.right_stick = (detail.axes[2], detail.axes[5])
+            detail.right_stick = (detail.axes[3], detail.axes[4])
 
             detail.left_trigger = (detail.axes[3] + 1) / 2
             detail.right_trigger = (detail.axes[4] + 1) / 2

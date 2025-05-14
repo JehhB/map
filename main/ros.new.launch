@@ -1,0 +1,150 @@
+<launch>
+    <node pkg="tf" type="static_transform_publisher" name="camera_link_transformer" args="0.1825 0.05 0.09335 -1.5708 0 -1.5708 base_footprint stereo_camera 100"/>
+
+    <group ns="stereo_camera">
+        <node pkg="nodelet" type="nodelet" name="stereo_nodelet"  args="manager"/>
+
+        <node pkg="nodelet" type="nodelet" name="stereo_throttle" args="load rtabmap_legacy/stereo_throttle stereo_nodelet">
+            <remap from="left/image"       to="left/image_raw"/>
+            <remap from="right/image"      to="right/image_raw"/>
+            <remap from="left/camera_info" to="left/camera_info"/>
+            <remap from="right/camera_info" to="right/camera_info"/>
+
+            <param name="queue_size" type="int" value="10"/>
+            <param name="rate" type="double" value="20"/>
+        </node>
+
+        <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc">
+            <remap from="left/image_raw"    to="left/image_raw_throttle"/>
+            <remap from="left/camera_info"  to="left/camera_info_throttle"/>
+            <remap from="right/image_raw"   to="right/image_raw_throttle"/>
+            <remap from="right/camera_info" to="right/camera_info_throttle"/>
+
+            <param name="P1" type="double" value="200.0" />
+            <param name="P2" type="double" value="400.0" />
+            <param name="correlation_window_size" type="int" value="5" />
+            <param name="disp12MaxDiff" type="int" value="2" />
+            <param name="disparity_range" type="int" value="112" />
+            <param name="min_disparity" type="int" value="0" />
+            <param name="prefilter_cap" type="int" value="6" />
+            <param name="prefilter_size" type="int" value="79" />
+            <param name="speckle_range" type="int" value="10" />
+            <param name="speckle_size" type="int" value="96" />
+            <param name="stereo_algorithm" type="int" value="1" />
+            <param name="texture_threshold" type="int" value="0" />
+            <param name="uniqueness_ratio" type="double" value="10.0" />
+        </node>
+
+        <node pkg="nodelet" type="nodelet" name="disparity2cloud" args="load rtabmap_util/point_cloud_xyz stereo_nodelet">
+            <remap from="disparity/image"       to="disparity"/>
+            <remap from="disparity/camera_info" to="right/camera_info_throttle"/>
+            <remap from="cloud"                 to="cloudXYZ"/>
+
+            <param name="voxel_size" type="double" value="0.05"/>
+            <param name="decimation" type="int" value="4"/>
+            <param name="max_depth" type="double" value="4"/>
+        </node>
+
+        <node pkg="nodelet" type="nodelet" name="obstacles_detection" args="load rtabmap_util/obstacles_detection stereo_nodelet">
+            <remap from="cloud" to="cloudXYZ"/>
+            <remap from="proj_obstacles" to="/planner_cloud"/>
+
+            <param name="frame_id" type="string" value="base_footprint"/>
+            <param name="map_frame_id" type="string" value="map"/>
+            <param name="wait_for_transform" type="bool" value="true"/>
+            <param name="min_cluster_size" type="int" value="20"/>
+            <param name="max_obstacles_height" type="double" value="0.0"/>
+        </node>
+    </group>
+
+    <group ns="planner">
+        <remap from="openni_points" to="/planner_cloud"/>
+        <remap from="map" to="/grid_map"/>
+        <remap from="move_base_simple/goal" to="/planner_goal"/>
+
+        <arg name="launch_dir" default="$(dirname)" />
+
+        <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+            <rosparam file="$(arg launch_dir)/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+            <rosparam file="$(arg launch_dir)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+            <rosparam file="$(arg launch_dir)/config/local_costmap_params.yaml" command="load" />
+            <rosparam file="$(arg launch_dir)/config/global_costmap_params.yaml" command="load" ns="global_costmap"/>
+            <rosparam file="$(arg launch_dir)/config/base_local_planner_params.yaml" command="load" />
+        </node>
+
+        <param name="cmd_vel/abtr_priority" value="10"/>
+    </group>
+
+
+    <node pkg="rtabmap_odom" type="stereo_odometry" name="stereo_odometry" output="screen">
+       <remap from="left/image_rect"       to="/stereo_camera/left/image_rect_color"/>
+       <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
+       <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
+       <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
+
+       <remap from="odom" to="/stereo_odometry"/>
+
+       <param name="frame_id"        type="string" value="base_footprint"/>
+       <param name="subscribe_stereo" type="bool" value="true"/>
+       <param name="subscribe_depth"  type="bool" value="false"/>
+       <param name="subscribe_rgbd"  type="bool" value="false"/>
+       <param name="publish_null_when_lost" value="false"/>
+
+       <param name="Odom/Strategy"      type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
+       <param name="Odom/ResetCountdown" value="1"/>
+       <param name="Vis/EstimationType" type="string" value="1"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
+       <param name="Vis/MaxDepth"       type="string" value="0"/>
+       <param name="Odom/GuessMotion" type="string" value="true"/>
+       <param name="Vis/MinInliers"     type="string" value="10"/>
+       <param name="OdomF2M/MaxSize"    type="string" value="1000"/>
+       <param name="GFTT/MinDistance"   type="string" value="10"/>
+       <param name="GFTT/QualityLevel"  type="string" value="0.00001"/>
+       <param name="GFTT/QualityLevel"  type="string" value="0.00001"/>
+       <param name="Reg/Force3DoF"    value="true" />
+    </node>
+
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="--delete_db_on_start">
+       <param name="subscribe_stereo" type="bool" value="true"/>
+       <param name="subscribe_depth"  type="bool" value="false"/>
+       <param name="subscribe_rgbd"      type="bool" value="false"/>
+       <param name="use_action_for_goal" type="bool" value="true"/>
+
+       <remap from="left/image_rect"   to="/stereo_camera/left/image_rect_color"/>
+       <remap from="right/image_rect"  to="/stereo_camera/right/image_rect"/>
+       <remap from="left/camera_info"  to="/stereo_camera/left/camera_info_throttle"/>
+       <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
+
+       <remap from="odom" to="/stereo_odometry"/>
+
+       <param name="frame_id"        type="string" value="base_footprint"/>
+       <param name="queue_size" type="int" value="30"/>
+       <param name="map_negative_poses_ignored" type="bool" value="true"/>
+
+       <!-- RTAB-Map's parameters -->
+       <param name="Rtabmap/TimeThr"                   type="string" value="700"/>
+       <param name="Grid/3D"                           type="string" value="false"/>
+       <param name="Grid/Sensor"                       type="string" value="1"/>
+       <param name="Grid/DepthDecimation"              type="string" value="2"/>
+       <param name="Grid/FlatObstacleDetected"         type="string" value="true"/>
+       <param name="Kp/MaxDepth"                       type="string" value="0"/>
+       <param name="Kp/DetectorStrategy"               type="string" value="6"/>
+       <param name="Vis/EstimationType"                type="string" value="1"/>   <!-- 0=3D->3D, 1=3D->2D (PnP) -->
+       <param name="Vis/MaxDepth"                      type="string" value="0"/>
+       <param name="Grid/RayTracing"                   type="string" value="true"/>
+       <param name="RGBD/CreateOccupancyGrid"          type="string" value="true"/>
+       <param name="Reg/Force3DoF"    value="true" />
+       <param name="Optimizer/Slam2D" value="true" />
+
+       <param name="Stereo/DenseStrategy" type="string" value="1" />
+       <param name="StereoSGBM/BlockSize" type="string" value="5" />
+       <param name="StereoSGBM/Disp12MaxDiff" type="string" value="2" />
+       <param name="StereoSGBM/MinDisparity" type="string" value="0" />
+       <param name="StereoSGBM/NumDisparities" type="string" value="112" />
+       <param name="StereoSGBM/P1" type="string" value="200" />
+       <param name="StereoSGBM/P2" type="string" value="400" />
+       <param name="StereoSGBM/PreFilterCap" type="string" value="31" />
+       <param name="StereoSGBM/SpeckleRange" type="string" value="10" />
+       <param name="StereoSGBM/SpeckleWindowSize" type="string" value="79" />
+       <param name="StereoSGBM/UniquenessRatio" type="string" value="10" />
+    </node>
+</launch>

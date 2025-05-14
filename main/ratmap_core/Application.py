@@ -139,12 +139,8 @@ class Application(EventTarget):
 
         detail = event.detail
         offsets = detail.left_stick
-        is_panning = detail.left_bumper
 
         if abs(offsets[0]) < 0.01 and abs(offsets[1]) < 0.01:
             return
 
-        if is_panning:
-            self.__main_gl.camera.pan(-offsets[0], offsets[1], delta_time=0.5)
-        else:
-            self.__main_gl.camera.walk(offsets[0], -offsets[1], delta_time=0.5)
+        self.__main_gl.camera.pan(-offsets[0], offsets[1], delta_time=0.5)
