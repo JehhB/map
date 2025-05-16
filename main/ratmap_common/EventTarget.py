@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Callable, Optional
 
 from reactivex.abc import DisposableBase
-from typing_extensions import Callable, TypeVar, override
+from typing_extensions import TypeVar, override
 
 from .AbstractEvent import AbstractEvent
 from .CategorizedSubject import CategorizedSubject

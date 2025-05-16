@@ -1,12 +1,19 @@
 import os
+import shutil
 import sys
 import traceback
+import zipfile
+from fileinput import filename
 from glob import glob
 from importlib import import_module
+from os.path import basename
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from tkinter import TclError
 from typing import TYPE_CHECKING, Dict
 
 import yaml
+from platformdirs import PlatformDirs
 from typing_extensions import override
 
 from ratmap_common import EventTarget
@@ -28,6 +35,11 @@ class ExtensionManager(EventTarget):
         self.__context = context
         self.__extensions = dict()
         self.add_path(BUILTIN_EXTENSIONS_FOLDER)
+        self.__extra_extensions = (
+            PlatformDirs("ratmap", "ratmap").user_data_path / "extensions"
+        )
+        self.__extra_extensions.mkdir(parents=True, exist_ok=True)
+        self.add_path(str(self.__extra_extensions))
 
     def add_path(self, path: str):
         yaml_glob = os.path.join(path, "*.yaml")
@@ -35,6 +47,35 @@ class ExtensionManager(EventTarget):
 
         for file in yaml_files:
             self.__load_description(file)
+
+    def add_zip(self, path: str):
+        with TemporaryDirectory() as td:
+            with zipfile.ZipFile(path, "r") as zip:
+                zip.extractall(td)
+
+                yaml_glob = os.path.join(td, "*.yaml")
+                yaml_files = glob(yaml_glob)
+                filenames = [basename(f) for f in yaml_files]
+
+                print(yaml_glob)
+
+                temp = Path(td)
+                for item in temp.iterdir():
+                    dst = self.__extra_extensions / item.name
+                    src = str(item)
+
+                    print(item)
+
+                    if os.path.exists(dst):
+                        if os.path.isdir(dst):
+                            shutil.rmtree(dst)
+                        else:
+                            os.remove(dst)
+                    shutil.move(src, dst)
+
+                for f in filenames:
+                    path = str(self.__extra_extensions / f)
+                    self.__load_description(path)
 
     def __load_description(self, path: str):
         try:

@@ -1,3 +1,4 @@
+from tkinter import filedialog
 from typing import Optional
 
 from ratmap_common import AbstractEvent, EventTarget
@@ -98,7 +99,23 @@ class Application(EventTarget):
                 self.main_window, "<Control-equal>", lambda e: reset_zoom()
             ),
             disposable_bind(self.main_window, "<Control-0>", lambda e: recenter()),
+            self.add_event_listener(
+                "activate.menu_main.extension.add", self.add_extension
+            ),
         )
+
+    def add_extension(self, _e: AbstractEvent):
+        filename = filedialog.askopenfilename(
+            parent=self.main_window,
+            title="Add extension",
+            filetypes=[("ZIP files", "*.zip")],
+            defaultextension="zip",
+        )
+
+        if not filename:
+            return
+
+        self.__extension_manager.add_zip(filename)
 
     def close_window(self):
         if self.__manage_extension_window is None:
