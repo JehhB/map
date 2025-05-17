@@ -16,6 +16,7 @@ from .ui import (
     MenuExtension,
     MenuMain,
     MenuNavigate,
+    MenuView,
 )
 
 
@@ -30,6 +31,7 @@ class Application(EventTarget):
     __extension_menu: MenuExtension
     __edit_menu: MenuEdit
     __navigate_menu: MenuNavigate
+    __view_menu: MenuView
 
     __manage_extension_window: Optional[ManageExtensionsWindow]
     __disposer: SetDisposer
@@ -46,6 +48,7 @@ class Application(EventTarget):
         self.__edit_menu = self.__main_menu.edit_menu
         self.__navigate_menu = self.__main_menu.navigate_menu
         self.__extension_menu = self.__main_menu.extension_menu
+        self.__view_menu = self.__main_menu.view_menu
 
         self.__extension_manager = ExtensionManager(self)
         self.__extension_manager.parent = self
@@ -59,6 +62,9 @@ class Application(EventTarget):
         self.__manage_extension_window = None
         self.__joystick = Joystick()
         self.__joystick.parent = self
+
+        show_legend: bool = self.config.get("core.show_legends", default=True)
+        self.view_menu.show_legends.on_next(show_legend)
 
         self.__disposer.add(
             self.__joystick.add_event_listener("joystick.poll", self.__handle_movement)
@@ -101,6 +107,9 @@ class Application(EventTarget):
             disposable_bind(self.main_window, "<Control-0>", lambda e: recenter()),
             self.add_event_listener(
                 "activate.menu_main.extension.add", self.add_extension
+            ),
+            self.view_menu.show_legends.subscribe(
+                lambda e: self.config.update("core.show_legends", e)
             ),
         )
 
@@ -175,6 +184,10 @@ class Application(EventTarget):
     @property
     def extension_menu(self) -> Menu:
         return self.__extension_menu
+
+    @property
+    def view_menu(self) -> MenuView:
+        return self.__view_menu
 
     @property
     def joystick(self) -> Joystick:

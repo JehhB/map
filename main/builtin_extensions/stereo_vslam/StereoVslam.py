@@ -11,6 +11,7 @@ from cv2.typing import MatLike
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from PIL.Image import Image
+from pyrr.rectangle import width
 from reactivex import Observable, Subject, empty, operators
 from reactivex.abc import DisposableBase
 from reactivex.subject import BehaviorSubject
@@ -449,6 +450,45 @@ class StereoVslam(BaseExtension):
         if self.__ros_bridge:
             self.__ros_bridge.reset()
 
+        def clear_mesh(mesh: Mesh):
+            mesh.vertices = np.array([], dtype=np.float32)
+            mesh.indices = np.array([], dtype=np.uint32)
+
+        def clear_path(mesh: Mesh):
+            direction_pose = [
+                # 1st point
+                0,
+                0,
+                0,
+                1.0,
+                1.0,
+                0.0,
+                # 2nd point
+                0.25,
+                0,
+                0,
+                1.0,
+                1.0,
+                0.0,
+            ]
+            mesh.vertices = np.array(direction_pose, dtype=np.float32)
+            mesh.indices = np.array([0, 1], dtype=np.uint32)
+
+        if self.__grid_mesh != -1:
+            self.__main_gl.update_mesh(self.__grid_mesh, clear_mesh)
+
+        if self.__graph_mesh != -1:
+            self.__main_gl.update_mesh(self.__graph_mesh, clear_path)
+
+        if self.__out_target_mesh != -1:
+            self.__main_gl.update_mesh(self.__out_target_mesh, clear_mesh)
+
+        if self.__set_target_mesh != -1:
+            self.__main_gl.update_mesh(self.__set_target_mesh, clear_mesh)
+
+        if self.__plan_mesh != -1:
+            self.__main_gl.update_mesh(self.__plan_mesh, clear_mesh)
+
     def __process_occupancy_grid(self, grid_msg: OccupancyGrid):
         if self.__grid_mesh == -1:
             return
@@ -495,7 +535,7 @@ class StereoVslam(BaseExtension):
                     [
                         [world_x, world_y, -50, r, g, b],
                         [world_x + resolution, world_y, -50, r, g, b],
-                        [world_x + resolution, world_y + resolution, 25, r, g, b],
+                        [world_x + resolution, world_y + resolution, -50, r, g, b],
                         [world_x, world_y + resolution, -50, r, g, b],
                     ]
                 )

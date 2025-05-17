@@ -12,6 +12,7 @@ from typing_extensions import (
     Literal,
     Optional,
     Protocol,
+    Required,
     Tuple,
     TypeAlias,
     TypedDict,
@@ -260,6 +261,33 @@ class MenuKwargs(SubMenuKwargs, total=False):
     tearoff: Union[bool, Literal[0, 1]]
 
 
+class BaseMenuCheckbuttonKwargs(TypedDict, total=False):
+    accelerator: str
+    activebackground: str
+    activeforeground: str
+    background: str
+    bitmap: str
+    columnbreak: int
+    command: Callable[[], object] | str
+    compound: Compound
+    font: FontDescription
+    foreground: str
+    hidemargin: bool
+    image: ImageSpec
+    indicatoron: bool
+    label: Required[str]
+    selectcolor: str
+    selectimage: ImageSpec
+    state: Literal["normal", "active", "disabled"]
+    underline: int
+
+
+class MenuCheckbuttonKwargs(BaseMenuCheckbuttonKwargs, total=False):
+    valuesubject: Subject[bool]
+    variable: tkinter.BooleanVar
+    changeevent: str
+
+
 class FrameKwargs(TypedDict, total=False):
     border: ScreenUnits
     borderwidth: ScreenUnits
@@ -305,6 +333,7 @@ __all__ = [
     "BaseEntryKwargs",
     "BaseImageLabelKwargs",
     "BaseLabelKwargs",
+    "BaseMenuCheckbuttonKwargs",
     "BaseScaleKwargs",
     "BaseSpinboxKwargs",
     "ButtonCommand",
@@ -320,6 +349,7 @@ __all__ = [
     "ImageLabelKwargs",
     "ImageSpec",
     "LabelKwargs",
+    "MenuCheckbuttonKwargs",
     "MenuKwargs",
     "Relief",
     "ScaleKwargs",

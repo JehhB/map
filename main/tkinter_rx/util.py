@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tkinter as tk
 from typing import Callable, Optional, Set, TypeVar, Union, overload
 
@@ -183,3 +184,22 @@ class SetDisposer(DisposableBase):
 def safe_dispose(disposable: Optional[DisposableBase]):
     if disposable is not None:
         disposable.dispose()
+
+
+def to_snake_case(text: str):
+    text = re.sub(r"[\s\-]+", "_", text)
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
+    return text.lower()
+
+
+def bind_recursive(
+    widget: tk.Misc, event: str, callback: Callable[[tk.Event[tk.Misc]], None]
+) -> DisposableBase:
+    disposers = SetDisposer()
+    disposers.add(disposable_bind(widget, event, callback))
+
+    for child in widget.winfo_children():
+        disposer = bind_recursive(child, event, callback)
+        disposers.add(disposer)
+
+    return disposers

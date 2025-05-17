@@ -7,6 +7,7 @@ from .MenuExtension import MenuExtension
 from .MenuFile import MenuFile
 from .MenuMain import MenuMain
 from .MenuNavigate import MenuNavigate
+from .MenuView import MenuView
 from .Mesh import Mesh
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "MenuMain",
     "MenuNavigate",
     "Mesh",
+    "MenuView",
 ]
