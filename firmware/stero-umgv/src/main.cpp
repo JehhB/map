@@ -36,6 +36,14 @@ httpd_handle_t startServer() {
                              .user_ctx = NULL};
     httpd_register_uri_handler(server, &motor_uri);
 #endif
+
+    httpd_uri_t flash_uri = {
+        .uri = "/flash",
+        .method = HTTP_GET,
+        .handler = flashHandler,
+        .user_ctx = NULL,
+    };
+    httpd_register_uri_handler(server, &flash_uri);
   }
   return server;
 }

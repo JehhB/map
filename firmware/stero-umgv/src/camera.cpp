@@ -152,6 +152,25 @@ void setupLedFlash(int pin) {
   ledcAttachPin(pin, LEDC_CHANNEL_7);
 }
 
+esp_err_t flashHandler(httpd_req_t *req) {
+  char query[127];
+  char value[15];
+
+  if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+    httpd_resp_send_500(req);
+    return ESP_FAIL;
+  }
+
+  if (httpd_query_key_value(query, "s", value, sizeof(value)) == ESP_OK) {
+    uint32_t level = strtoul(value, NULL, 10);
+    ledcWrite(LEDC_CHANNEL_7, level);
+    return ESP_OK;
+  }
+
+  httpd_resp_send_500(req);
+  return ESP_FAIL;
+}
+
 httpd_handle_t startStreamServer() {
   httpd_handle_t server = NULL;
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();

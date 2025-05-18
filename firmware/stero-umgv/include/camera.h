@@ -13,4 +13,6 @@ static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: "
 
 esp_err_t setupCamera();
 httpd_handle_t startStreamServer();
+
 void setupLedFlash(int pin);
+esp_err_t flashHandler(httpd_req_t *req);
