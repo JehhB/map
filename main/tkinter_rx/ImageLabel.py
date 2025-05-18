@@ -6,12 +6,15 @@ from cv2.typing import MatLike
 from PIL import Image, ImageTk
 from reactivex import Observable
 from reactivex.abc import DisposableBase
-from typing_extensions import Unpack, override
+from typing_extensions import TypeAlias, Unpack, override
 
 from ratmap_common import EventTarget
 
 from .typing import BaseImageLabelKwargs, ImageLabelKwargs
 from .util import safe_callback
+
+_Image: TypeAlias = Union[Image.Image, MatLike, str, None]
+ImageObservable: TypeAlias = Observable[_Image]
 
 
 class ImageLabel(tk.Label):
@@ -19,7 +22,7 @@ class ImageLabel(tk.Label):
     height: int
     photo: Optional[ImageTk.PhotoImage]
 
-    __image_observable: Optional[Observable[Union[Image.Image, MatLike, str, None]]]
+    __image_observable: Optional[ImageObservable]
     __disposer: Optional[DisposableBase]
 
     __event_target: EventTarget
@@ -35,9 +38,12 @@ class ImageLabel(tk.Label):
 
         self.width = kwargs.pop("width", 100)
         self.height = kwargs.pop("height", 100)
-        self.image_observable = kwargs.pop("imageobservable", None)
+        image_observable = kwargs.pop("imageobservable", None)
 
         super().__init__(master, **cast(BaseImageLabelKwargs, kwargs))
+
+        self.image_observable = image_observable
+
         self.__set_blank_image()
         self.__event_target = EventTarget()
 
@@ -48,9 +54,7 @@ class ImageLabel(tk.Label):
     @image_observable.setter
     def image_observable(
         self,
-        image_observable: Optional[
-            Observable[Union[Image.Image, MatLike, str, None]]
-        ] = None,
+        image_observable: Optional[ImageObservable] = None,
     ):
         del self.image_observable
 
@@ -75,7 +79,7 @@ class ImageLabel(tk.Label):
     def __resize_image(self, img: Image.Image):
         return img.resize((self.width, self.height))
 
-    def update_image(self, image: Union[Image.Image, MatLike, str, None]):
+    def update_image(self, image: _Image):
         if image is None:
             self.__set_blank_image()
         elif isinstance(image, Image.Image):

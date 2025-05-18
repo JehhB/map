@@ -10,7 +10,7 @@ from typing_extensions import Unpack
 from .typing import FrameKwargs
 
 
-class ScrolledFrame(ttk.Frame):
+class ScrolledFrame(tk.Frame):
     canvas: tk.Canvas
     viewPort: ttk.Frame
     vsb: ttk.Scrollbar

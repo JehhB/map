@@ -1,7 +1,9 @@
 from .StereoVslamMenu import StereoVslamMenu
+from .StereoVslamToolbar import StereoVslamToolbar
 from .StereoVslamWindow import StereoVslamWindow
 
 __all__ = [
-    "StereoVslamWindow",
+    "StereoVslamToolbar",
     "StereoVslamMenu",
+    "StereoVslamWindow",
 ]

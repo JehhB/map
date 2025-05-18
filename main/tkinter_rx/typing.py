@@ -326,6 +326,16 @@ class CheckbuttonKwargs(BaseCheckbuttonKwargs, total=False):
     changeevent: str
 
 
+class NotebookKwargs(TypedDict, total=False):
+    class_: str
+    cursor: Cursor
+    height: int
+    name: str
+    style: str
+    takefocus: TakeFocusValue
+    width: int
+
+
 __all__ = [
     "Anchor",
     "BaseButtonKwargs",
@@ -351,6 +361,7 @@ __all__ = [
     "LabelKwargs",
     "MenuCheckbuttonKwargs",
     "MenuKwargs",
+    "NotebookKwargs",
     "Relief",
     "ScaleKwargs",
     "ScreenUnits",

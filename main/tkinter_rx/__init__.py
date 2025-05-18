@@ -4,7 +4,6 @@ from tkinter.ttk import (
     LabeledScale,
     LabelFrame,
     Menubutton,
-    Notebook,
     PanedWindow,
     Progressbar,
     Radiobutton,
@@ -17,9 +16,10 @@ from tkinter.ttk import (
 from .Button import Button, ButtonEvent
 from .Checkbutton import Checkbutton, CheckbuttonEvent
 from .Entry import Entry, EntryEvent
-from .ImageLabel import ImageLabel
+from .ImageLabel import ImageLabel, ImageObservable
 from .Label import Label, LabelEvent
 from .Menu import Menu, MenuEvent
+from .Notebook import Notebook
 from .Scale import Scale, ScaleEvent
 from .ScrolledFrame import ScrolledFrame
 from .Spinbox import Spinbox, SpinboxEvent
@@ -36,10 +36,11 @@ __all__ = [
     "EntryEvent",
     "Frame",
     "ImageLabel",
+    "ImageObservable",
     "Label",
     "LabelEvent",
-    "LabeledScale",
     "LabelFrame",
+    "LabeledScale",
     "Menu",
     "MenuEvent",
     "Menubutton",

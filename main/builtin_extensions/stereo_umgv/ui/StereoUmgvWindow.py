@@ -48,13 +48,15 @@ class StereoUmgvWindow(tk.Toplevel):
         motor_controler: Subject[str],
         right_transformer: ImageTransformer,
         left_transformer: ImageTransformer,
+        left_ip: BehaviorSubject[str],
+        right_ip: BehaviorSubject[str],
     ) -> None:
         super().__init__(master)
 
         self.title("Ratmap UMGV")
 
-        self.right_ip = BehaviorSubject("")
-        self.left_ip = BehaviorSubject("")
+        self.right_ip = right_ip
+        self.left_ip = left_ip
 
         self.__event_target = EventTarget()
 

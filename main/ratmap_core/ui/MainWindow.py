@@ -5,9 +5,10 @@ import tkinter as tk
 from typing_extensions import override
 
 from ratmap_common import EventTarget
-from tkinter_rx import Frame, Label
+from tkinter_rx import Frame, Notebook
 from tkinter_rx.util import SetDisposer, bind_recursive, disposable_bind
 
+from .Legends import Legends
 from .MainGl import MainGl
 from .MenuMain import MenuMain
 
@@ -18,6 +19,7 @@ class MainWindow(tk.Tk):
     __main_menu: MenuMain
     __event_target: EventTarget
     __main_gl: MainGl
+    __toolbar: Notebook
 
     __gl_frame: Frame
 
@@ -38,63 +40,23 @@ class MainWindow(tk.Tk):
 
         self.__main_gl.place(relwidth=1.0, relheight=1.0, x=0, y=0)
 
-        self.__gl_frame.pack(side=tk.TOP, expand=tk.YES, fill=tk.BOTH)
+        self.__gl_frame.grid(row=0, column=0, sticky=tk.NSEW)
 
-        self.__legends = Frame(self)
+        self.__legends = Legends(self.__gl_frame)
 
-        Label(self.__legends, text="Legends").pack(side=tk.TOP, pady=4)
-
-        legend = Frame(self.__legends)
-        canvas = tk.Canvas(legend, width=8, height=8, bg="#000000")
-        canvas.pack(side=tk.LEFT, expand=tk.NO)
-        Label(legend, text="Unknown space").pack(side=tk.LEFT, expand=tk.NO, padx=2)
-        legend.pack(side=tk.TOP, expand=tk.YES, fill=tk.X, padx=4)
-
-        legend = Frame(self.__legends)
-        canvas = tk.Canvas(legend, width=8, height=8, bg="#eeeeee")
-        canvas.pack(side=tk.LEFT, expand=tk.NO)
-        Label(legend, text="Ground").pack(side=tk.LEFT, expand=tk.NO, padx=2)
-        legend.pack(side=tk.TOP, expand=tk.YES, fill=tk.X, padx=4)
-
-        legend = Frame(self.__legends)
-        canvas = tk.Canvas(legend, width=8, height=8, bg="#dd2222")
-        canvas.pack(side=tk.LEFT, expand=tk.NO)
-        Label(legend, text="Obstacle").pack(side=tk.LEFT, expand=tk.NO, padx=2)
-        legend.pack(side=tk.TOP, expand=tk.YES, fill=tk.X, padx=4)
-
-        legend = Frame(self.__legends)
-        canvas = tk.Canvas(legend, width=18, height=3, bg="#ffff00")
-        canvas.pack(side=tk.LEFT, expand=tk.NO)
-        Label(legend, text="Current position").pack(side=tk.LEFT, expand=tk.NO, padx=2)
-        legend.pack(side=tk.TOP, expand=tk.YES, fill=tk.X, padx=4)
-
-        legend = Frame(self.__legends)
-        canvas = tk.Canvas(legend, width=18, height=3, bg="#0000ff")
-        canvas.pack(side=tk.LEFT, expand=tk.NO)
-        Label(legend, text="Recorded path").pack(side=tk.LEFT, expand=tk.NO, padx=2)
-        legend.pack(side=tk.TOP, expand=tk.YES, fill=tk.X, padx=4)
-
-        legend = Frame(self.__legends)
-        canvas = tk.Canvas(legend, width=18, height=3, bg="#00ff00")
-        canvas.pack(side=tk.LEFT, expand=tk.NO)
-        Label(legend, text="Planned path").pack(side=tk.LEFT, expand=tk.NO, padx=2)
-        legend.pack(side=tk.TOP, expand=tk.YES, fill=tk.X, padx=4)
-
-        legend = Frame(self.__legends)
-        canvas = tk.Canvas(legend, width=16, height=16)
-        _ = canvas.create_oval(1, 2, 15, 14, fill="#22dd22", outline="")
-        canvas.pack(side=tk.LEFT, expand=tk.NO)
-        Label(legend, text="Target").pack(side=tk.LEFT, expand=tk.NO, padx=2)
-        legend.pack(side=tk.TOP, expand=tk.YES, fill=tk.X, padx=4)
+        self.__toolbar = Notebook(self, width=320)
 
         self.__disposer = SetDisposer()
 
         _ = self.config(menu=self.__main_menu)
+        _ = self.columnconfigure(0, weight=1)
+        _ = self.rowconfigure(0, weight=1)
 
         self.__disposer.add(
             disposable_bind(self, "<KeyPress>", self.__handle_movement),
             bind_recursive(self.__legends, "<Button-1>", self.__close_legends),
             self.main_menu.view_menu.show_legends.subscribe(self.__legends_state),
+            self.main_menu.view_menu.show_toolbar.subscribe(self.__toolbar_state),
         )
 
     def __legends_state(self, state: bool):
@@ -103,6 +65,13 @@ class MainWindow(tk.Tk):
             return
 
         self.__legends.place(x=8, rely=0.98, anchor=tk.SW)
+
+    def __toolbar_state(self, state: bool):
+        if not state:
+            self.__toolbar.grid_forget()
+            return
+
+        self.__toolbar.grid(row=0, column=1, sticky=tk.NSEW)
 
     def __close_legends(self, _event: tk.Event[tk.Misc]):
         self.main_menu.view_menu.show_legends.on_next(False)
@@ -132,6 +101,10 @@ class MainWindow(tk.Tk):
     @property
     def gl_frame(self):
         return self.__gl_frame
+
+    @property
+    def toolbar(self):
+        return self.__toolbar
 
     @override
     def destroy(self) -> None:

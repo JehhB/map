@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional, cast, final
 
 from reactivex import operators
 from reactivex.abc import DisposableBase
+from reactivex.subject import BehaviorSubject
 from typing_extensions import override
 
 from ratmap_common.AbstractEvent import AbstractEvent
@@ -13,7 +14,7 @@ from ratmap_core import BaseExtension, JoystickEvent
 from tkinter_rx.util import SetDisposer, safe_dispose
 
 from .ImageTransformer import ImageTransformer
-from .ui import StereoUmgvWindow
+from .ui import StereoUmgvToolbar, StereoUmgvWindow
 from .UmgvBridge import UmgvBridge
 
 if TYPE_CHECKING:
@@ -32,6 +33,8 @@ class StereoUmgv(BaseExtension):
     __controler_disposable: Optional[DisposableBase]
     __transform_disposable: Optional[DisposableBase]
 
+    __toolbar: Optional[StereoUmgvToolbar]
+
     @property
     @override
     def metadata(self) -> ExtensionMetadata:
@@ -47,6 +50,7 @@ class StereoUmgv(BaseExtension):
         self.stereo_vslam: "StereoVslam"
         self.umgv_bridge: UmgvBridge
         self.__extension_window = None
+        self.__toolbar = None
 
         _ = self.add_event_listener("stereo_umgv.connect", self.__connect_handler)
 
@@ -74,6 +78,9 @@ class StereoUmgv(BaseExtension):
             "stereo_umgv.start_mapping", lambda e: self.stereo_vslam.start_mapping()
         )
 
+        self.__left_ip = BehaviorSubject("")
+        self.__right_ip = BehaviorSubject("")
+
         self.__controler_disposable = None
         self.__right_transformer: ImageTransformer
         self.__left_transformer: ImageTransformer
@@ -84,6 +91,17 @@ class StereoUmgv(BaseExtension):
         self.ensure_deps()
         safe_dispose(self.__transform_disposable)
         safe_dispose(self.__controler_disposable)
+
+        right_ip: str = self.context.config.get(
+            f"{self.config_namespace}.right_ip", default=""
+        )
+
+        left_ip: str = self.context.config.get(
+            f"{self.config_namespace}.left_ip", default=""
+        )
+
+        self.__right_ip.on_next(right_ip)
+        self.__left_ip.on_next(left_ip)
 
         self.stereo_vslam = cast(
             "StereoVslam", self.extension_manager.get("stereo_vslam")
@@ -132,6 +150,20 @@ class StereoUmgv(BaseExtension):
             "joystick.poll", self.__handle_joystick
         )
 
+        if (
+            self.stereo_vslam.left_image_subject is not None
+            and self.stereo_vslam.right_image_subject is not None
+        ):
+            self.__toolbar = StereoUmgvToolbar(
+                self.context.toolbar,
+                left_image_observable=self.stereo_vslam.left_image_subject,
+                right_image_observable=self.stereo_vslam.right_image_subject,
+                x_subject=self.umgv_bridge.x_subject,
+                y_subject=self.umgv_bridge.y_subject,
+            )
+            self.__toolbar.event_target.parent = self
+            self.context.toolbar.add(self.__toolbar, text=StereoUmgv.LABEL)
+
         super().start()
 
     def __handle_joystick(self, event: AbstractEvent):
@@ -151,6 +183,14 @@ class StereoUmgv(BaseExtension):
 
         self.__close_window()
         _ = self.context.extension_menu.remove(label=StereoUmgv.LABEL)
+
+        try:
+            _ = self.context.toolbar.remove(StereoUmgv.LABEL)
+            if self.__toolbar is not None:
+                self.__toolbar.destroy()
+            self.__toolbar = None
+        except:
+            traceback.print_exc()
 
         safe_dispose(self.__controler_disposable)
         self.__controler_disposable = None
@@ -206,6 +246,8 @@ class StereoUmgv(BaseExtension):
             self.umgv_bridge.motor_controller,
             self.__right_transformer,
             self.__left_transformer,
+            self.__left_ip,
+            self.__right_ip,
         )
         self.__extension_window.protocol("WM_DELETE_WINDOW", self.__close_window)
         self.__extension_window.event_target.parent = self
@@ -228,21 +270,6 @@ class StereoUmgv(BaseExtension):
             calibrator_params.chessboard_cols
         )
 
-        right_ip: str = self.context.config.get(
-            f"{self.config_namespace}.right_ip", default=""
-        )
-
-        left_ip: str = self.context.config.get(
-            f"{self.config_namespace}.left_ip", default=""
-        )
-
-        def set_configs():
-            if self.__extension_window is not None:
-                self.__extension_window.right_ip.on_next(right_ip)
-                self.__extension_window.left_ip.on_next(left_ip)
-
-        _ = self.__extension_window.after(200, set_configs)
-
     def __close_window(self):
         if self.__extension_window is None:
             return
@@ -251,11 +278,9 @@ class StereoUmgv(BaseExtension):
         self.__extension_window = None
 
     def __connect_handler(self, _e: AbstractEvent):
-        if self.__extension_window is None:
-            return
+        right_ip = self.__right_ip.value
+        left_ip = self.__left_ip.value
 
-        right_ip = self.__extension_window.right_ip.value
-        left_ip = self.__extension_window.left_ip.value
         res = self.umgv_bridge.connect(
             right_ip,
             left_ip,

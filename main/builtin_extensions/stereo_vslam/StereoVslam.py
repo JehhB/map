@@ -1,5 +1,6 @@
 import math
 import tkinter as tk
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from tkinter import messagebox
@@ -30,7 +31,7 @@ from tkinter_rx.util import safe_dispose
 from .Calibrator import Calibrator, CalibratorParams
 from .CameraInfo import StereoCameraInfo
 from .RosBridge import RosBridge
-from .ui import StereoVslamWindow
+from .ui import StereoVslamToolbar, StereoVslamWindow
 
 
 class CalibratorParamsHolder:
@@ -75,6 +76,7 @@ class StereoVslam(BaseExtension):
     __calibrator_disposer: Optional[DisposableBase]
     __inspect_subject: Subject[Tuple[float, float, float, float]]
     __maingl_click_disposer: Optional[DisposableBase]
+    __toolbar: Optional[StereoVslamToolbar]
 
     __calibration_executor: ThreadPoolExecutor
     __graph_mesh: int
@@ -106,6 +108,7 @@ class StereoVslam(BaseExtension):
         self.__set_target_mesh = -1
         self.__out_target_mesh = -1
         self.__maingl_click_disposer = None
+        self.__toolbar = None
 
         self.__extension_lock = Lock()
 
@@ -207,6 +210,16 @@ class StereoVslam(BaseExtension):
             "main_gl.double_click", self.__add_target
         )
 
+        self.__toolbar = StereoVslamToolbar(
+            self.context.toolbar,
+            self.left_image_subject,
+            self.right_image_subject,
+            self.__ros_bridge.disparity_image_observable,
+        )
+        self.context.toolbar.add(self.__toolbar, text=StereoVslam.LABEL)
+
+        self.reset_map()
+
     def process_images(
         self,
         images: Tuple[
@@ -241,7 +254,6 @@ class StereoVslam(BaseExtension):
 
     @override
     def stop(self) -> None:
-        super().stop()
 
         safe_dispose(self.left_image_subject)
         self.left_image_subject = None
@@ -289,6 +301,16 @@ class StereoVslam(BaseExtension):
         self.__close_window()
         _ = self.context.extension_menu.remove(label=StereoVslam.LABEL)
         _ = self.context.edit_menu.remove(label="Reset map")
+
+        try:
+            _ = self.context.toolbar.remove(StereoVslam.LABEL)
+            if self.__toolbar is not None:
+                self.__toolbar.destroy()
+            self.__toolbar = None
+        except:
+            traceback.print_exc()
+
+        super().stop()
 
     def __close_window(self):
         if self.__extension_window is None:
@@ -650,8 +672,8 @@ class StereoVslam(BaseExtension):
         if not isinstance(detail, tk.Event) or not isinstance(target, MainGl):
             return
 
-        x = detail.x / cast(int, target.width)
-        y = detail.y / cast(int, target.height)
+        x = detail.x / target.winfo_width()
+        y = detail.y / target.winfo_height()
 
         res = self.__main_gl.camera.get_world_position((x, y))
 

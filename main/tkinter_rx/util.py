@@ -139,10 +139,15 @@ class __DisposableBind(DisposableBase):
         self.__widget = widget
         self.__cbn = cbn
         self.__seq = seq
+        self.__disposed = False
 
     @override
     def dispose(self) -> None:
+        if self.__disposed:
+            return
+
         self.__widget.unbind(self.__seq, self.__cbn)
+        self.__disposed = True
 
 
 def disposable_bind(
@@ -157,10 +162,15 @@ class CallbackDisposer(DisposableBase):
         super().__init__()
         self.__cbn = cbn
         self.__variable = variable
+        self.__disposed = False
 
     @override
     def dispose(self) -> None:
+        if self.__disposed:
+            return
+
         self.__variable.trace_remove("write", self.__cbn)
+        self.__disposed = True
 
 
 class SetDisposer(DisposableBase):

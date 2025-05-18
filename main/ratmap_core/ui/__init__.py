@@ -1,4 +1,5 @@
 from .Camera import Camera
+from .Legends import Legends
 from .MainGl import MainGl
 from .MainWindow import MainWindow
 from .ManageExtensionsWindow import ManageExtensionsWindow
@@ -22,4 +23,5 @@ __all__ = [
     "MenuNavigate",
     "Mesh",
     "MenuView",
+    "Legends",
 ]

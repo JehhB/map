@@ -1,8 +1,9 @@
+import traceback
 from tkinter import filedialog
 from typing import Optional
 
 from ratmap_common import AbstractEvent, EventTarget
-from tkinter_rx import Menu
+from tkinter_rx import Menu, Notebook
 from tkinter_rx.util import SetDisposer, disposable_bind
 
 from .Config import Config
@@ -25,6 +26,7 @@ class Application(EventTarget):
     __extension_manager: ExtensionManager
     __main_window: MainWindow
     __main_gl: MainGl
+    __toolbar: Notebook
     __joystick: Joystick
 
     __main_menu: MenuMain
@@ -43,6 +45,8 @@ class Application(EventTarget):
         self.__main_window = MainWindow()
         self.__main_window.event_target.parent = self
         self.__main_gl = self.__main_window.main_gl
+        self.__toolbar = self.__main_window.toolbar
+        self.__toolbar.event_target.parent = self
 
         self.__main_menu = self.__main_window.main_menu
         self.__edit_menu = self.__main_menu.edit_menu
@@ -63,12 +67,23 @@ class Application(EventTarget):
         self.__joystick = Joystick()
         self.__joystick.parent = self
 
-        show_legend: bool = self.config.get("core.show_legends", default=True)
+        show_legend: bool = self.config.get("core.legends.show", default=True)
         self.view_menu.show_legends.on_next(show_legend)
+
+        show_toolbar: bool = self.config.get("core.toolbar.show", default=True)
+        self.view_menu.show_toolbar.on_next(show_toolbar)
+
+        try:
+            selected: str = self.config.get("core.toolbar.selected")
+            _ = self.main_window.after(200, lambda: self.toolbar.select_with(selected))
+        except:
+            traceback.print_exc()
 
         self.__disposer.add(
             self.__joystick.add_event_listener("joystick.poll", self.__handle_movement)
         )
+
+        self.__main_window.protocol("WM_DELETE_WINDOW", self.__on_close)
 
         zoom_sensitivity = 2.0
 
@@ -109,7 +124,16 @@ class Application(EventTarget):
                 "activate.menu_main.extension.add", self.add_extension
             ),
             self.view_menu.show_legends.subscribe(
-                lambda e: self.config.update("core.show_legends", e)
+                lambda e: self.config.update("core.legends.show", e)
+            ),
+            self.view_menu.show_toolbar.subscribe(
+                lambda e: self.config.update("core.toolbar.show", e)
+            ),
+            self.add_event_listener(
+                "tab_change",
+                lambda e: self.__config.update(
+                    "core.toolbar.selected", self.toolbar.tab("current", "text")
+                ),
             ),
         )
 
@@ -145,13 +169,27 @@ class Application(EventTarget):
 
         self.__manage_extension_window.protocol("WM_DELETE_WINDOW", self.close_window)
 
+    def __on_close(self):
+        try:
+            self.__joystick.dispose()
+        except:
+            traceback.print_exc()
+
+        try:
+            self.__extension_manager.dispose()
+        except:
+            traceback.print_exc()
+
+        try:
+            self.__config.dispose()
+        except:
+            traceback.print_exc()
+
+        self.__main_window.destroy()
+
     def mainloop(self):
         self.__joystick.start_thread()
         self.__main_window.mainloop()
-
-        self.__joystick.dispose()
-        self.__extension_manager.dispose()
-        self.__config.dispose()
 
     @property
     def extension_manager(self) -> ExtensionManager:
@@ -168,6 +206,10 @@ class Application(EventTarget):
     @property
     def main_gl(self) -> MainGl:
         return self.__main_gl
+
+    @property
+    def toolbar(self) -> Notebook:
+        return self.__toolbar
 
     @property
     def main_menu(self) -> Menu:
