@@ -6,8 +6,7 @@
 #include "hal/ledc_types.h"
 
 #define MOTOR_FALLOF_MS 500
-#define FRAME_MOTOR_FORWARD 0x10
-#define FRAME_MOTOR_BACKWARD 0x11
+#define FRAME_MOTOR_UPDATE 0x10
 
 typedef struct {
   gpio_num_t pwm;

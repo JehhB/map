@@ -42,30 +42,23 @@ esp_err_t motorHandler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt) {
 
   uint8_t opcode = ((uint8_t *)ws_pkt->payload)[0];
 
-  if (opcode != FRAME_MOTOR_FORWARD && opcode != FRAME_MOTOR_BACKWARD) {
+  if (opcode != FRAME_MOTOR_UPDATE) {
     return ESP_FAIL;
   }
 
-  uint8_t speed_value = ((uint8_t *)ws_pkt->payload)[1];
-  int8_t speed;
-  speed = (speed_value > 127) ? 127 : speed_value;
-
-  if (opcode == FRAME_MOTOR_FORWARD) {
-  } else {
-    speed = -speed;
-  }
+  int8_t speed = ((int8_t *)ws_pkt->payload)[1];
 
   globalMotorState.speed = speed;
   globalMotorState.updated_at = millis();
 
   log_i("Updated motor speed: %d", speed);
 
-  const char *resp = "Motor updated";
+  const uint8_t resp[] = {0};
   httpd_ws_frame_t resp_frame;
   memset(&resp_frame, 0, sizeof(httpd_ws_frame_t));
   resp_frame.type = HTTPD_WS_TYPE_TEXT;
   resp_frame.payload = (uint8_t *)resp;
-  resp_frame.len = strlen(resp);
+  resp_frame.len = 1;
 
   esp_err_t ret = httpd_ws_send_frame(req, &resp_frame);
 
@@ -79,6 +72,7 @@ esp_err_t motorHandler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt) {
 void setupMotor(const motor_config_t &config) {
   ledcSetup(config.ledcChannel, 3000, 8);
   ledcAttachPin(config.pwm, config.ledcChannel);
+  ledcWrite(config.ledcChannel, 0);
 
   gpio_config_t out_config = {
       .pin_bit_mask = (1ULL << config.forward) | (1ULL << config.backward),
@@ -86,6 +80,9 @@ void setupMotor(const motor_config_t &config) {
       .pull_up_en = GPIO_PULLUP_DISABLE,
       .pull_down_en = GPIO_PULLDOWN_DISABLE,
   };
+
+  gpio_set_level(config.forward, 0);
+  gpio_set_level(config.backward, 0);
 }
 
 void setMotor(int8_t speed, const motor_config_t &config) {

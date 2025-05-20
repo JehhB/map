@@ -1,9 +1,10 @@
-import math
+import asyncio
 import threading
 from typing import Optional
 
 import cv2
-import requests
+import numpy as np
+import websockets
 from cv2.typing import MatLike
 from reactivex import Observable
 from reactivex.abc import DisposableBase
@@ -15,6 +16,7 @@ from typing_extensions import override
 class Connection(DisposableBase):
     __image_subject: BehaviorSubject[Optional[MatLike]]
     scheduler: ThreadPoolScheduler
+    __socket: Optional[websockets.WebSocketClientProtocol]
 
     def __init__(
         self,
@@ -26,13 +28,11 @@ class Connection(DisposableBase):
         self.__capture_thread = None
         self.__stop_capture = threading.Event()
         self.__image_subject = BehaviorSubject(None)
+        self.__socket = None
 
-    def start(self):
-        r = requests.get(self.__control_url, timeout=5)
-        if r.status_code != 200:
-            raise RuntimeError("Url not valid")
-
-        self.__start_video_capture()
+    async def start(self):
+        self.__socket = await websockets.connect(self.__control_url)
+        # self.__start_video_capture()
 
     def __start_video_capture(self):
         """Start a thread for capturing video frames from MJPEG stream"""
@@ -61,8 +61,12 @@ class Connection(DisposableBase):
         cap.release()
 
     def motor(self, speed: float):
+        if self.__socket is None:
+            return
+
         speed_int = max(-127, min(int(127 * speed), 127))
-        _ = requests.get(f"{self.__control_url}/motor?s={speed_int}")
+        if speed_int > 0:
+            asyncio.run(self.__socket.send(np.array([0x10, speed], dtype=np.int8)))
 
     @override
     def dispose(self) -> None:

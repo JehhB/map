@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import math
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -57,15 +58,22 @@ class UmgvBridge(DisposableBase):
         self.__connection_disposer: Optional[DisposableBase] = None
         self.__executor = ThreadPoolExecutor(max_workers=cpu_count())
 
+    async def __start_connection(self):
+        if self.right_connection is None or self.left_connection is None:
+            return
+        _ = await asyncio.gather(
+            self.right_connection.start(), self.left_connection.start()
+        )
+
     def connect(self, right_ip: str, left_ip: str) -> bool:
         try:
             safe_dispose(self.right_connection)
             safe_dispose(self.left_connection)
             safe_dispose(self.__connection_disposer)
 
-            right_control = f"http://{right_ip}:80"
+            right_control = f"ws://{right_ip}/ws"
             right_stream = f"http://{right_ip}:81"
-            left_control = f"http://{left_ip}:80"
+            left_control = f"ws://{left_ip}/ws"
             left_stream = f"http://{left_ip}:81"
 
             self.right_connection = Connection(
@@ -78,13 +86,7 @@ class UmgvBridge(DisposableBase):
                 left_stream,
             )
 
-            left_future = self.__executor.submit(self.left_connection.start)
-            right_future = self.__executor.submit(self.right_connection.start)
-
-            left_future.result()
-            right_future.result()
-
-            self.right_connection.start()
+            asyncio.run(self.__start_connection())
 
             self.__connection_disposer = SetDisposer()
 

@@ -169,12 +169,12 @@ esp_err_t flashHandler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt) {
   log_i("Updated flashlight duty cycle: %d", duty_cycle);
 
   // Send acknowledgment
-  const char *resp = "Flashlight updated";
+  const uint8_t resp[] = {0};
   httpd_ws_frame_t resp_frame;
   memset(&resp_frame, 0, sizeof(httpd_ws_frame_t));
-  resp_frame.type = HTTPD_WS_TYPE_TEXT;
+  resp_frame.type = HTTPD_WS_TYPE_BINARY;
   resp_frame.payload = (uint8_t *)resp;
-  resp_frame.len = strlen(resp);
+  resp_frame.len = 0;
 
   esp_err_t ret = httpd_ws_send_frame(req, &resp_frame);
   if (ret != ESP_OK) {
