@@ -7,6 +7,7 @@
 #include "ws.h"
 #include <WiFi.h>
 #include <cstddef>
+#include <strings.h>
 
 const char *ssid = "RatmapAP";
 const char *password = "Ratmap19";
@@ -24,6 +25,12 @@ const frame_handler_t ws_frame_handlers[] = {
     flashHandler,
     ping_frame_handler,
 };
+
+#ifdef MOTOR_CONTROLS
+const size_t ws_frame_handler_count = 3;
+#else
+const size_t ws_frame_handler_count = 2;
+#endif
 
 extern const size_t ws_frame_handler_count;
 
@@ -45,6 +52,7 @@ httpd_handle_t startServer() {
                                    .handler = ws_handler,
                                    .user_ctx = NULL,
                                    .is_websocket = true};
+    httpd_register_uri_handler(server, &ws);
   }
   return server;
 }
@@ -52,16 +60,16 @@ httpd_handle_t startServer() {
 void setup() {
   Serial.begin(115200);
 
+  setupLedFlash(LED_GPIO_NUM);
+#ifdef MOTOR_CONTROLS
+  setupMotor(DEFAULT_MOTOR);
+#endif
+
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-
-  setupLedFlash(LED_GPIO_NUM);
-#ifdef MOTOR_CONTROLS
-  setupMotor(DEFAULT_MOTOR);
-#endif
 
   esp_err_t result = setupCamera();
 

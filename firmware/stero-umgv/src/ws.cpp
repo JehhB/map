@@ -1,13 +1,16 @@
 #include "ws.h"
 #include "esp32-hal-log.h"
+#include "esp_http_server.h"
+#include <cstring>
 
 esp_err_t ws_handler(httpd_req_t *req) {
   httpd_ws_frame_t ws_pkt;
   uint8_t static_buf[MAX_WS_FRAME_SIZE]; // Static buffer for frame payload
   esp_err_t ret;
+  memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
 
   if (req->method == HTTP_GET) {
-    log_i(TAG, "Handshake done, the new connection was opened");
+    log_i("Handshake done, the new connection was opened");
     return ESP_OK;
   }
 
@@ -33,18 +36,21 @@ esp_err_t ws_handler(httpd_req_t *req) {
     }
   }
 
-  for (int i = 0; i < ws_frame_handler_count; ++i) {
+  for (size_t i = 0; i < ws_frame_handler_count; ++i) {
     frame_handler_t handler = ws_frame_handlers[i];
 
     if ((*handler)(req, &ws_pkt) == ESP_OK) {
-      log_i("Frame handled by handler at index %ld",
-            (long)(handler - frame_handlers));
+      log_i("Frame handled by handler at index %d", i);
       return ESP_OK;
     }
   }
 
-  log_w(TAG, "No handler processed the frame (type: %d, len: %d)", ws_pkt.type,
+  log_w("No handler processed the frame (type: %d, len: %d)", ws_pkt.type,
         ws_pkt.len);
+
+  if (ws_pkt.type == HTTPD_WS_TYPE_BINARY && ws_pkt.len >= 1) {
+    log_w("No handler processed the frame (opcode: 0x%x)", ws_pkt.payload[0]);
+  }
 
   return ESP_OK;
 }
