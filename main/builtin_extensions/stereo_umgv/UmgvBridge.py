@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import math
 import traceback
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 from time import time
 from typing import Callable, Literal, Optional, Tuple, Union
 
@@ -24,7 +27,6 @@ class UmgvBridge(DisposableBase):
     y_subject: BehaviorSubject[float]
 
     scaler: BehaviorSubject[float]
-    motor_controller: BehaviorSubject[Union[Literal["left", "right"], str]]
 
     right_connection: Optional[Connection]
     left_connection: Optional[Connection]
@@ -41,7 +43,6 @@ class UmgvBridge(DisposableBase):
         self.x_subject = BehaviorSubject(0.0)
         self.y_subject = BehaviorSubject(0.0)
         self.scaler = BehaviorSubject(1.0)
-        self.motor_controller = BehaviorSubject("right")
 
         self.right_connection = None
         self.left_connection = None
@@ -54,6 +55,7 @@ class UmgvBridge(DisposableBase):
         self.__right_transform = BehaviorSubject(None)
 
         self.__connection_disposer: Optional[DisposableBase] = None
+        self.__executor = ThreadPoolExecutor(max_workers=cpu_count())
 
     def connect(self, right_ip: str, left_ip: str) -> bool:
         try:
@@ -76,6 +78,14 @@ class UmgvBridge(DisposableBase):
                 left_stream,
             )
 
+            left_future = self.__executor.submit(self.left_connection.start)
+            right_future = self.__executor.submit(self.right_connection.start)
+
+            left_future.result()
+            right_future.result()
+
+            self.right_connection.start()
+
             self.__connection_disposer = SetDisposer()
 
             images_observable = reactivex.combine_latest(
@@ -89,7 +99,7 @@ class UmgvBridge(DisposableBase):
             )
 
             control_observable = reactivex.combine_latest(
-                self.x_subject, self.y_subject, self.motor_controller, self.scaler
+                self.x_subject, self.y_subject, self.scaler
             ).pipe(operators.throttle_first(0.3))
             self.__connection_disposer.add(
                 control_observable.subscribe(self.__send_motor)
@@ -137,12 +147,45 @@ class UmgvBridge(DisposableBase):
         self.__send_image(left_image, left_transform, self.__left_image_observer)
         self.__timestamp_observer.on_next(int(time() * 1e9))
 
-    def __send_motor(self, state: Tuple[float, float, str, float]):
-        x, y, motor_controler, scaler = state
-        if motor_controler == "left" and self.left_connection is not None:
-            self.left_connection.motor(x * scaler, y * scaler)
-        elif self.right_connection is not None:
-            self.right_connection.motor(x * scaler, y * scaler)
+    def __send_motor(self, state: Tuple[float, float, float]):
+        if self.left_connection is None or self.right_connection is None:
+            return
+
+        x, y, scaler = state
+
+        y = -y
+        speed = math.sqrt(x * x + y * y)
+        angle = math.atan2(y, x)  # angle from (1,0) counter-clockwise
+        angle = angle if angle >= 0 else (2 * math.pi + angle)
+        angle = math.degrees(angle)
+
+        if speed < 0.2:
+            left = 0
+            right = 0
+        elif abs(y) < math.sin(math.radians(15)):
+            if x < 0:
+                left = -speed
+                right = speed
+            else:
+                right = -speed
+                left = speed
+        elif y > 0:
+            if x < 0:
+                right = speed
+                left = (1 + x) * speed
+            else:
+                left = speed
+                right = (1 - x) * speed
+        else:
+            if x < 0:
+                right = -speed
+                left = (1 + x) * -speed
+            else:
+                left = -speed
+                right = (1 - x) * -speed
+
+        _ = self.__executor.submit(self.left_connection.motor, left)
+        _ = self.__executor.submit(self.right_connection.motor, right)
 
     @property
     def left_transform(self) -> Observer[Optional[Callable[[MatLike], MatLike]]]:

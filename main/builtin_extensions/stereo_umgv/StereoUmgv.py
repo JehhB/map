@@ -80,11 +80,14 @@ class StereoUmgv(BaseExtension):
 
         self.__left_ip = BehaviorSubject("")
         self.__right_ip = BehaviorSubject("")
+        self.__flash = BehaviorSubject(0.0)
 
         self.__controler_disposable = None
         self.__right_transformer: ImageTransformer
         self.__left_transformer: ImageTransformer
         self.__transform_disposable = None
+
+        self.__scale_disposable: Optional[DisposableBase] = None
 
     @override
     def start(self) -> None:
@@ -102,6 +105,7 @@ class StereoUmgv(BaseExtension):
 
         self.__right_ip.on_next(right_ip)
         self.__left_ip.on_next(left_ip)
+        self.__flash.on_next(0)
 
         self.stereo_vslam = cast(
             "StereoVslam", self.extension_manager.get("stereo_vslam")
@@ -111,6 +115,14 @@ class StereoUmgv(BaseExtension):
             self.stereo_vslam.left_image_subject,
             self.stereo_vslam.right_image_subject,
             self.stereo_vslam.timestamp_subject,
+        )
+        scale: float = self.context.config.get(
+            f"{self.config_namespace}.scaler", default=1.0
+        )
+        self.umgv_bridge.scaler.on_next(scale)
+        safe_dispose(self.__scale_disposable)
+        self.__scale_disposable = self.umgv_bridge.scaler.subscribe(
+            lambda e: self.context.config.update(f"{self.config_namespace}.scaler", e)
         )
 
         if not self.stereo_vslam.extension_lock.acquire(True, 0.1):
@@ -122,6 +134,7 @@ class StereoUmgv(BaseExtension):
         self.__right_transformer = ImageTransformer(
             f"{self.config_namespace}.right_transform", self.context.config
         )
+
         self.__left_transformer = ImageTransformer(
             f"{self.config_namespace}.left_transform", self.context.config
         )
@@ -192,6 +205,12 @@ class StereoUmgv(BaseExtension):
         except:
             traceback.print_exc()
 
+        self.__left_transformer.dispose()
+        self.__right_transformer.dispose()
+
+        safe_dispose(self.__scale_disposable)
+        self.__scale_disposable = None
+
         safe_dispose(self.__controler_disposable)
         self.__controler_disposable = None
 
@@ -243,7 +262,7 @@ class StereoUmgv(BaseExtension):
             self.umgv_bridge.x_subject,
             self.umgv_bridge.y_subject,
             self.umgv_bridge.scaler,
-            self.umgv_bridge.motor_controller,
+            self.__flash,
             self.__right_transformer,
             self.__left_transformer,
             self.__left_ip,

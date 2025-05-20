@@ -16,11 +16,9 @@ from tkinter_rx import (
     ImageLabel,
     Label,
     LabelFrame,
-    Radiobutton,
     Scale,
     Spinbox,
 )
-from tkinter_rx.util import bind_subject_to_variable
 
 from ..ImageTransformer import ImageTransformer
 from .Joystick import Joystick
@@ -45,7 +43,7 @@ class StereoUmgvWindow(tk.Toplevel):
         x_subject: BehaviorSubject[float],
         y_subject: BehaviorSubject[float],
         scaler: Subject[float],
-        motor_controler: Subject[str],
+        flash: Subject[float],
         right_transformer: ImageTransformer,
         left_transformer: ImageTransformer,
         left_ip: BehaviorSubject[str],
@@ -164,6 +162,15 @@ class StereoUmgvWindow(tk.Toplevel):
         self.joystick = Joystick(joystick_frame, x_subject, y_subject, 150)
         self.joystick.grid(row=0, column=0, padx=4, pady=4, rowspan=7)
 
+        flash_label = flash.pipe(operators.map(lambda x: "Flashlight (%.2f)" % x))
+        Label(joystick_frame, textobservable=flash_label).grid(
+            row=4, column=1, padx=4, columnspan=2, sticky="w"
+        )
+
+        Scale(joystick_frame, valuesubject=flash, from_=0.0, to=1.0).grid(
+            row=5, column=1, padx=4, columnspan=2, sticky="ew"
+        )
+
         scaler_label = scaler.pipe(operators.map(lambda x: "Speed scaler (%.2f)" % x))
 
         Label(joystick_frame, textobservable=scaler_label).grid(
@@ -172,23 +179,6 @@ class StereoUmgvWindow(tk.Toplevel):
 
         Scale(joystick_frame, valuesubject=scaler, from_=0.0, to=1.0).grid(
             row=2, column=1, padx=4, columnspan=2, sticky="ew"
-        )
-
-        Label(joystick_frame, text="Controller select").grid(
-            row=4, column=1, padx=4, columnspan=2, sticky="w"
-        )
-
-        variable = tk.StringVar(self, "right")
-        self.__control_disposer = bind_subject_to_variable(
-            motor_controler, variable, self
-        )
-
-        Radiobutton(
-            joystick_frame, text="Right", value="right", variable=variable
-        ).grid(row=5, column=1, padx=4, sticky="w")
-
-        Radiobutton(joystick_frame, text="Left", value="left", variable=variable).grid(
-            row=5, column=2, padx=4, sticky="w"
         )
 
         _ = joystick_frame.rowconfigure((0, 6), weight=2)
@@ -320,7 +310,6 @@ class StereoUmgvWindow(tk.Toplevel):
         del self.calibration_count_observable
         del self.is_calibrating_observable
         self.__event_target.dispose()
-        self.__control_disposer.dispose()
         return super().destroy()
 
     @property

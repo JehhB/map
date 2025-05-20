@@ -25,13 +25,13 @@ class Connection(DisposableBase):
         self.__control_url = control_url
         self.__capture_thread = None
         self.__stop_capture = threading.Event()
+        self.__image_subject = BehaviorSubject(None)
 
+    def start(self):
         r = requests.get(self.__control_url, timeout=5)
         if r.status_code != 200:
             raise RuntimeError("Url not valid")
 
-        # Store the image_subject for publishing captured frames
-        self.__image_subject = BehaviorSubject(None)
         self.__start_video_capture()
 
     def __start_video_capture(self):
@@ -60,43 +60,9 @@ class Connection(DisposableBase):
 
         cap.release()
 
-    def motor(self, x: float, y: float):
-        y = -y
-        speed = math.sqrt(x * x + y * y)
-        angle = math.atan2(y, x)  # angle from (1,0) counter-clockwise
-        angle = angle if angle >= 0 else (2 * math.pi + angle)
-        angle = math.degrees(angle)
-
-        if speed < 0.2:
-            left = 0
-            right = 0
-        elif abs(y) < math.sin(math.radians(15)):
-            if x < 0:
-                left = -speed
-                right = speed
-            else:
-                right = -speed
-                left = speed
-        elif y > 0:
-            if x < 0:
-                right = speed
-                left = (1 + x) * speed
-            else:
-                left = speed
-                right = (1 - x) * speed
-        else:
-            if x < 0:
-                right = -speed
-                left = (1 + x) * -speed
-            else:
-                left = -speed
-                right = (1 - x) * -speed
-        self.__update_motor(left / 2, right / 2)
-
-    def __update_motor(self, left: float, right: float):
-        left_i = max(-127, min(int(127 * left), 127))
-        right_i = max(-127, min(int(127 * right), 127))
-        _ = requests.get(f"{self.__control_url}/motor?l={left_i}&r={right_i}")
+    def motor(self, speed: float):
+        speed_int = max(-127, min(int(127 * speed), 127))
+        _ = requests.get(f"{self.__control_url}/motor?s={speed_int}")
 
     @override
     def dispose(self) -> None:
