@@ -10,9 +10,10 @@ static const char *_STREAM_CONTENT_TYPE =
 static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: "
                                   "%u\r\nX-Timestamp: %d.%06d\r\n\r\n";
+#define FRAME_FLASHLIGHT 0x20
 
 esp_err_t setupCamera();
 httpd_handle_t startStreamServer();
 
 void setupLedFlash(int pin);
-esp_err_t flashHandler(httpd_req_t *req);
+esp_err_t flashHandler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt);

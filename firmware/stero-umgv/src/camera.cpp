@@ -152,23 +152,38 @@ void setupLedFlash(int pin) {
   ledcAttachPin(pin, LEDC_CHANNEL_7);
 }
 
-esp_err_t flashHandler(httpd_req_t *req) {
-  char query[127];
-  char value[15];
-
-  if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
-    httpd_resp_send_500(req);
+esp_err_t flashHandler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt) {
+  if (ws_pkt->type != HTTPD_WS_TYPE_BINARY || ws_pkt->len < 2) {
     return ESP_FAIL;
   }
 
-  if (httpd_query_key_value(query, "s", value, sizeof(value)) == ESP_OK) {
-    uint32_t level = strtoul(value, NULL, 10);
-    ledcWrite(LEDC_CHANNEL_7, level);
-    return ESP_OK;
+  uint8_t opcode = ((uint8_t *)ws_pkt->payload)[0];
+
+  if (opcode != FRAME_FLASHLIGHT) {
+    return ESP_FAIL;
   }
 
-  httpd_resp_send_500(req);
-  return ESP_FAIL;
+  uint8_t duty_cycle = ((uint8_t *)ws_pkt->payload)[1];
+
+  // Set flashlight duty cycle
+  ledcWrite(LEDC_CHANNEL_7, duty_cycle);
+
+  log_i("Updated flashlight duty cycle: %d", duty_cycle);
+
+  // Send acknowledgment
+  const char *resp = "Flashlight updated";
+  httpd_ws_frame_t resp_frame;
+  memset(&resp_frame, 0, sizeof(httpd_ws_frame_t));
+  resp_frame.type = HTTPD_WS_TYPE_TEXT;
+  resp_frame.payload = (uint8_t *)resp;
+  resp_frame.len = strlen(resp);
+
+  esp_err_t ret = httpd_ws_send_frame(req, &resp_frame);
+  if (ret != ESP_OK) {
+    log_e("Failed to send response: %d", ret);
+  }
+
+  return ESP_OK;
 }
 
 httpd_handle_t startStreamServer() {

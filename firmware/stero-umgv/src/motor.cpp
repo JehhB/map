@@ -1,20 +1,20 @@
 #include "motor.h"
+#include "driver/gpio.h"
 #include "esp32-hal-ledc.h"
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include "hal/gpio_types.h"
 #include <Arduino.h>
 #include <cstdint>
 #include <cstdlib>
 
 typedef struct {
-  int8_t speed_left;
-  int8_t speed_right;
+  int8_t speed;
   int64_t updated_at;
 } motor_state_t;
 
 motor_state_t globalMotorState = {
-    .speed_left = 0,
-    .speed_right = 0,
+    .speed = 0,
     .updated_at = 0,
 };
 
@@ -22,11 +22,9 @@ void updateMotor() {
   int64_t time = millis();
 
   if (time - globalMotorState.updated_at < MOTOR_FALLOF_MS) {
-    setMotorL(globalMotorState.speed_left, DEFAULT_MOTORS);
-    setMotorR(globalMotorState.speed_right, DEFAULT_MOTORS);
+    setMotor(globalMotorState.speed, DEFAULT_MOTOR);
   } else {
-    setMotorL(0, DEFAULT_MOTORS);
-    setMotorR(0, DEFAULT_MOTORS);
+    setMotor(0, DEFAULT_MOTOR);
   }
 }
 
@@ -37,32 +35,42 @@ void motorTask(void *param) {
   }
 }
 
-esp_err_t motorHandler(httpd_req_t *req) {
-  char query[127];
-  char value[15];
-
-  bool isUpdated = false;
-
-  if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
-    httpd_resp_send_500(req);
+esp_err_t motorHandler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt) {
+  if (ws_pkt->type != HTTPD_WS_TYPE_BINARY || ws_pkt->len < 2) {
     return ESP_FAIL;
   }
 
-  if (httpd_query_key_value(query, "l", value, sizeof(value)) == ESP_OK) {
-    isUpdated = true;
-    globalMotorState.speed_left = strtol(value, NULL, 10);
+  uint8_t opcode = ((uint8_t *)ws_pkt->payload)[0];
+
+  if (opcode != FRAME_MOTOR_FORWARD && opcode != FRAME_MOTOR_BACKWARD) {
+    return ESP_FAIL;
   }
 
-  if (httpd_query_key_value(query, "r", value, sizeof(value)) == ESP_OK) {
-    isUpdated = true;
-    globalMotorState.speed_right = strtol(value, NULL, 10);
-  }
+  uint8_t speed_value = ((uint8_t *)ws_pkt->payload)[1];
+  int8_t speed;
+  speed = (speed_value > 127) ? 127 : speed_value;
 
-  if (isUpdated) {
-    globalMotorState.updated_at = millis();
-    httpd_resp_sendstr(req, "Updated motor state");
+  if (opcode == FRAME_MOTOR_FORWARD) {
   } else {
-    httpd_resp_sendstr(req, "No updates");
+    speed = -speed;
+  }
+
+  globalMotorState.speed = speed;
+  globalMotorState.updated_at = millis();
+
+  log_i("Updated motor speed: %d", speed);
+
+  const char *resp = "Motor updated";
+  httpd_ws_frame_t resp_frame;
+  memset(&resp_frame, 0, sizeof(httpd_ws_frame_t));
+  resp_frame.type = HTTPD_WS_TYPE_TEXT;
+  resp_frame.payload = (uint8_t *)resp;
+  resp_frame.len = strlen(resp);
+
+  esp_err_t ret = httpd_ws_send_frame(req, &resp_frame);
+
+  if (ret != ESP_OK) {
+    log_e("Failed to send response: %d", ret);
   }
 
   return ESP_OK;
@@ -70,32 +78,24 @@ esp_err_t motorHandler(httpd_req_t *req) {
 
 void setupMotor(const motor_config_t &config) {
   ledcSetup(config.ledcChannel, 3000, 8);
-  ledcAttachPin(config.pin, config.ledcChannel);
+  ledcAttachPin(config.pwm, config.ledcChannel);
+
+  gpio_config_t out_config = {
+      .pin_bit_mask = (1ULL << config.forward) | (1ULL << config.backward),
+      .mode = GPIO_MODE_OUTPUT,
+      .pull_up_en = GPIO_PULLUP_DISABLE,
+      .pull_down_en = GPIO_PULLDOWN_DISABLE,
+  };
 }
 
-void setupMotors(const motors_t &config) {
-  setupMotor(config.left_forward);
-  setupMotor(config.right_forward);
-  setupMotor(config.left_backward);
-  setupMotor(config.right_backward);
-}
-
-void setMotorL(int8_t speed, const motors_t &config) {
+void setMotor(int8_t speed, const motor_config_t &config) {
   if (speed < 0) {
-    ledcWrite(config.left_backward.ledcChannel, -speed * 2 - 1);
-    ledcWrite(config.left_forward.ledcChannel, 0);
+    ledcWrite(config.ledcChannel, -speed * 2 - 1);
+    gpio_set_level(config.forward, 0);
+    gpio_set_level(config.backward, 1);
   } else {
-    ledcWrite(config.left_forward.ledcChannel, speed * 2 + 1);
-    ledcWrite(config.left_backward.ledcChannel, 0);
-  }
-}
-
-void setMotorR(int8_t speed, const motors_t &config) {
-  if (speed < 0) {
-    ledcWrite(config.right_backward.ledcChannel, -speed * 2 - 1);
-    ledcWrite(config.right_forward.ledcChannel, 0);
-  } else {
-    ledcWrite(config.right_forward.ledcChannel, speed * 2 + 1);
-    ledcWrite(config.right_backward.ledcChannel, 0);
+    ledcWrite(config.ledcChannel, speed * 2 + 1);
+    gpio_set_level(config.forward, 1);
+    gpio_set_level(config.backward, 0);
   }
 }

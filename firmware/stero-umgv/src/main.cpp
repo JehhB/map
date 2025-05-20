@@ -4,6 +4,7 @@
 #include "esp_http_server.h"
 #include "http_parser.h"
 #include "motor.h"
+#include "ws.h"
 #include <WiFi.h>
 #include <cstddef>
 
@@ -15,6 +16,16 @@ esp_err_t ok_handler(httpd_req_t *req) {
   httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
   return ESP_OK;
 }
+
+const frame_handler_t ws_frame_handlers[] = {
+#ifdef MOTOR_CONTROLS
+    motorHandler,
+#endif
+    flashHandler,
+    ping_frame_handler,
+};
+
+extern const size_t ws_frame_handler_count;
 
 httpd_handle_t startServer() {
   httpd_handle_t server = NULL;
@@ -29,21 +40,11 @@ httpd_handle_t startServer() {
     };
     httpd_register_uri_handler(server, &index_uri);
 
-#ifdef MOTOR_CONTROLS
-    httpd_uri_t motor_uri = {.uri = "/motor",
-                             .method = HTTP_GET,
-                             .handler = motorHandler,
-                             .user_ctx = NULL};
-    httpd_register_uri_handler(server, &motor_uri);
-#endif
-
-    httpd_uri_t flash_uri = {
-        .uri = "/flash",
-        .method = HTTP_GET,
-        .handler = flashHandler,
-        .user_ctx = NULL,
-    };
-    httpd_register_uri_handler(server, &flash_uri);
+    static const httpd_uri_t ws = {.uri = "/ws",
+                                   .method = HTTP_GET,
+                                   .handler = ws_handler,
+                                   .user_ctx = NULL,
+                                   .is_websocket = true};
   }
   return server;
 }
@@ -57,8 +58,12 @@ void setup() {
     Serial.print(".");
   }
 
-  esp_err_t result = setupCamera();
   setupLedFlash(LED_GPIO_NUM);
+#ifdef MOTOR_CONTROLS
+  setupMotor(DEFAULT_MOTOR);
+#endif
+
+  esp_err_t result = setupCamera();
 
   if (result == ESP_OK) {
     ledcWrite(LEDC_CHANNEL_7, 8);
@@ -73,10 +78,6 @@ void setup() {
 
   startServer();
   startStreamServer();
-
-#ifdef MOTOR_CONTROLS
-  setupMotors(DEFAULT_MOTORS);
-#endif
 
   ledcWrite(LEDC_CHANNEL_7, 8);
   delay(200);
