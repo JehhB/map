@@ -149,10 +149,8 @@ class Joystick(tk.Canvas):
         x = max(-1.0, min(1.0, x))
         y = max(-1.0, min(1.0, y))
 
-        # Only update if values have changed significantly
-        if abs(self.x.value - x) > 0.001 or abs(self.y.value - y) > 0.001:
-            self.x.on_next(x)
-            self.y.on_next(y)
+        self.x.on_next(x)
+        self.y.on_next(y)
 
     @override
     def destroy(self) -> None:

@@ -143,6 +143,22 @@ esp_err_t setupCamera() {
     log_e("Camera init failed with error 0x%x", err);
     return err;
   }
+  sensor_t *s = esp_camera_sensor_get();
+  s->set_contrast(s, 2);
+  s->set_brightness(s, 0);
+  s->set_saturation(s, 0);
+
+  s->set_exposure_ctrl(s, 0);
+  s->set_aec_value(s, 600);
+
+  s->set_whitebal(s, 0);
+  s->set_awb_gain(s, 0);
+  s->set_wb_mode(s, 0);
+
+  s->set_gain_ctrl(s, 0);
+  s->set_agc_gain(s, 0);
+
+  s->set_special_effect(s, 0);
 
   return ESP_OK;
 }

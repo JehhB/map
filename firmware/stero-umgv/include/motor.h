@@ -15,10 +15,10 @@ typedef struct {
 } motor_config_t;
 
 const motor_config_t DEFAULT_MOTOR = {
-    .pwm = GPIO_NUM_15,
+    .pwm = GPIO_NUM_13,
     .ledcChannel = LEDC_CHANNEL_1,
-    .forward = GPIO_NUM_12,
-    .backward = GPIO_NUM_13,
+    .forward = GPIO_NUM_15,
+    .backward = GPIO_NUM_14,
 };
 
 esp_err_t motorHandler(httpd_req_t *req);
