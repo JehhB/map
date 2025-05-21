@@ -1,9 +1,9 @@
 import os
 import traceback
 from tkinter import messagebox
-from typing import TYPE_CHECKING, Optional, cast, final
+from typing import TYPE_CHECKING, Optional, Tuple, cast, final
 
-from reactivex import operators
+from reactivex import observable, operators
 from reactivex.abc import DisposableBase
 from reactivex.subject import BehaviorSubject
 from typing_extensions import override
@@ -80,7 +80,6 @@ class StereoUmgv(BaseExtension):
 
         self.__left_ip = BehaviorSubject("")
         self.__right_ip = BehaviorSubject("")
-        self.__flash = BehaviorSubject(0.0)
 
         self.__controler_disposable = None
         self.__right_transformer: ImageTransformer
@@ -105,7 +104,6 @@ class StereoUmgv(BaseExtension):
 
         self.__right_ip.on_next(right_ip)
         self.__left_ip.on_next(left_ip)
-        self.__flash.on_next(0)
 
         self.stereo_vslam = cast(
             "StereoVslam", self.extension_manager.get("stereo_vslam")
@@ -159,8 +157,10 @@ class StereoUmgv(BaseExtension):
             label=StereoUmgv.LABEL, command=self.__open_window
         )
 
-        self.__controler_disposable = self.context.add_event_listener(
-            "joystick.poll", self.__handle_joystick
+        self.__controler_disposable = (
+            self.context.observe("joystick.poll")
+            .pipe(operators.pairwise())
+            .subscribe(self.__handle_joystick)
         )
 
         if (
@@ -179,13 +179,30 @@ class StereoUmgv(BaseExtension):
 
         super().start()
 
-    def __handle_joystick(self, event: AbstractEvent):
-        if not isinstance(event, JoystickEvent):
+    def __handle_joystick(self, events: Tuple[AbstractEvent, AbstractEvent]):
+        prev, curr = events
+
+        if not isinstance(curr, JoystickEvent) or not isinstance(prev, JoystickEvent):
             return
 
-        detail = event.detail
+        detail = curr.detail
         self.umgv_bridge.x_subject.on_next(detail.right_stick[0])
         self.umgv_bridge.y_subject.on_next(detail.right_stick[1])
+
+        x_prev_pressed = prev.detail.buttons[0]
+        x_pressed = detail.buttons[0]
+
+        if not x_prev_pressed and x_pressed:
+            self.umgv_bridge.toggle_flashlight()
+
+        left_trigger = (detail.axes[2] + 1.0) / 2.0
+        right_trigger = (detail.axes[5] + 1.0) / 2.0
+
+        if detail.left_bumper:
+            self.umgv_bridge.flash.on_next(left_trigger)
+
+        if detail.right_bumper:
+            self.umgv_bridge.scaler.on_next(right_trigger)
 
     @override
     def stop(self) -> None:
@@ -262,7 +279,7 @@ class StereoUmgv(BaseExtension):
             self.umgv_bridge.x_subject,
             self.umgv_bridge.y_subject,
             self.umgv_bridge.scaler,
-            self.__flash,
+            self.umgv_bridge.flash,
             self.__right_transformer,
             self.__left_transformer,
             self.__left_ip,

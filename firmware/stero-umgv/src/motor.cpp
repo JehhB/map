@@ -1,20 +1,20 @@
 #include "motor.h"
+#include "driver/gpio.h"
 #include "esp32-hal-ledc.h"
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include "hal/gpio_types.h"
 #include <Arduino.h>
 #include <cstdint>
 #include <cstdlib>
 
 typedef struct {
-  int8_t speed_left;
-  int8_t speed_right;
+  int8_t speed;
   int64_t updated_at;
 } motor_state_t;
 
 motor_state_t globalMotorState = {
-    .speed_left = 0,
-    .speed_right = 0,
+    .speed = 0,
     .updated_at = 0,
 };
 
@@ -22,11 +22,9 @@ void updateMotor() {
   int64_t time = millis();
 
   if (time - globalMotorState.updated_at < MOTOR_FALLOF_MS) {
-    setMotorL(globalMotorState.speed_left, DEFAULT_MOTORS);
-    setMotorR(globalMotorState.speed_right, DEFAULT_MOTORS);
+    setMotor(globalMotorState.speed, DEFAULT_MOTOR);
   } else {
-    setMotorL(0, DEFAULT_MOTORS);
-    setMotorR(0, DEFAULT_MOTORS);
+    setMotor(0, DEFAULT_MOTOR);
   }
 }
 
@@ -48,14 +46,9 @@ esp_err_t motorHandler(httpd_req_t *req) {
     return ESP_FAIL;
   }
 
-  if (httpd_query_key_value(query, "l", value, sizeof(value)) == ESP_OK) {
+  if (httpd_query_key_value(query, "s", value, sizeof(value)) == ESP_OK) {
     isUpdated = true;
-    globalMotorState.speed_left = strtol(value, NULL, 10);
-  }
-
-  if (httpd_query_key_value(query, "r", value, sizeof(value)) == ESP_OK) {
-    isUpdated = true;
-    globalMotorState.speed_right = strtol(value, NULL, 10);
+    globalMotorState.speed = strtol(value, NULL, 10);
   }
 
   if (isUpdated) {
@@ -70,32 +63,33 @@ esp_err_t motorHandler(httpd_req_t *req) {
 
 void setupMotor(const motor_config_t &config) {
   ledcSetup(config.ledcChannel, 3000, 8);
-  ledcAttachPin(config.pin, config.ledcChannel);
+  ledcAttachPin(config.pwm, config.ledcChannel);
+  ledcWrite(config.ledcChannel, 0);
+
+  gpio_config_t gpio_conf = {
+      .pin_bit_mask = (1ULL << config.forward) | (1ULL << config.backward),
+      .mode = GPIO_MODE_OUTPUT,
+      .pull_up_en = GPIO_PULLUP_DISABLE,
+      .pull_down_en = GPIO_PULLDOWN_DISABLE,
+      .intr_type = GPIO_INTR_DISABLE,
+  };
+  gpio_config(&gpio_conf);
+  gpio_set_level(config.forward, 0);
+  gpio_set_level(config.backward, 0);
 }
 
-void setupMotors(const motors_t &config) {
-  setupMotor(config.left_forward);
-  setupMotor(config.right_forward);
-  setupMotor(config.left_backward);
-  setupMotor(config.right_backward);
-}
-
-void setMotorL(int8_t speed, const motors_t &config) {
+void setMotor(int8_t speed, const motor_config_t &config) {
   if (speed < 0) {
-    ledcWrite(config.left_backward.ledcChannel, -speed * 2 - 1);
-    ledcWrite(config.left_forward.ledcChannel, 0);
-  } else {
-    ledcWrite(config.left_forward.ledcChannel, speed * 2 + 1);
-    ledcWrite(config.left_backward.ledcChannel, 0);
-  }
-}
+    ledcWrite(config.ledcChannel, -speed * 2 - 1);
+    gpio_set_level(config.forward, 0);
+    gpio_set_level(config.backward, 1);
 
-void setMotorR(int8_t speed, const motors_t &config) {
-  if (speed < 0) {
-    ledcWrite(config.right_backward.ledcChannel, -speed * 2 - 1);
-    ledcWrite(config.right_forward.ledcChannel, 0);
+    log_i("Updated speed (Backward: %d)", -speed * 2 - 1, 0, 1);
   } else {
-    ledcWrite(config.right_forward.ledcChannel, speed * 2 + 1);
-    ledcWrite(config.right_backward.ledcChannel, 0);
+    ledcWrite(config.ledcChannel, speed * 2 + 1);
+    gpio_set_level(config.backward, 0);
+    gpio_set_level(config.forward, 1);
+
+    log_i("Updated speed (Forward: %d)", speed * 2 + 1, );
   }
 }

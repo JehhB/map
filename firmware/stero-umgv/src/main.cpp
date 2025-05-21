@@ -51,6 +51,11 @@ httpd_handle_t startServer() {
 void setup() {
   Serial.begin(115200);
 
+#ifdef MOTOR_CONTROLS
+  setupMotor(DEFAULT_MOTOR);
+#endif
+  setupLedFlash(LED_GPIO_NUM);
+
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -58,7 +63,6 @@ void setup() {
   }
 
   esp_err_t result = setupCamera();
-  setupLedFlash(LED_GPIO_NUM);
 
   if (result == ESP_OK) {
     ledcWrite(LEDC_CHANNEL_7, 8);
@@ -73,10 +77,6 @@ void setup() {
 
   startServer();
   startStreamServer();
-
-#ifdef MOTOR_CONTROLS
-  setupMotors(DEFAULT_MOTORS);
-#endif
 
   ledcWrite(LEDC_CHANNEL_7, 8);
   delay(200);

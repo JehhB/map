@@ -64,6 +64,12 @@ class Connection(DisposableBase):
         speed_int = max(-127, min(int(127 * speed), 127))
         _ = requests.get(f"{self.__control_url}/motor?s={speed_int}")
 
+    def flashlight(self, intensity: float):
+        intensity_int = max(0, min(int(255 * intensity), 255))
+        if intensity_int < 2:
+            intensity_int = 0
+        _ = requests.get(f"{self.__control_url}/flash?s={intensity_int}")
+
     @override
     def dispose(self) -> None:
         # Stop the video capture thread if it's running

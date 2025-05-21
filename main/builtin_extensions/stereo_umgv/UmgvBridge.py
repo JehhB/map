@@ -25,6 +25,7 @@ from .Connection import Connection
 class UmgvBridge(DisposableBase):
     x_subject: BehaviorSubject[float]
     y_subject: BehaviorSubject[float]
+    flash: BehaviorSubject[float]
 
     scaler: BehaviorSubject[float]
 
@@ -43,6 +44,7 @@ class UmgvBridge(DisposableBase):
         self.x_subject = BehaviorSubject(0.0)
         self.y_subject = BehaviorSubject(0.0)
         self.scaler = BehaviorSubject(1.0)
+        self.flash = BehaviorSubject(0.0)
 
         self.right_connection = None
         self.left_connection = None
@@ -78,13 +80,11 @@ class UmgvBridge(DisposableBase):
                 left_stream,
             )
 
-            left_future = self.__executor.submit(self.left_connection.start)
-            right_future = self.__executor.submit(self.right_connection.start)
+            left_start = self.__executor.submit(self.left_connection.start)
+            right_start = self.__executor.submit(self.right_connection.start)
 
-            left_future.result()
-            right_future.result()
-
-            self.right_connection.start()
+            left_start.result()
+            right_start.result()
 
             self.__connection_disposer = SetDisposer()
 
@@ -101,14 +101,24 @@ class UmgvBridge(DisposableBase):
             control_observable = reactivex.combine_latest(
                 self.x_subject, self.y_subject, self.scaler
             ).pipe(operators.throttle_first(0.3))
+            flash_observable = self.flash.pipe(operators.throttle_first(0.2))
+
             self.__connection_disposer.add(
-                control_observable.subscribe(self.__send_motor)
+                control_observable.subscribe(self.__send_motor),
+                flash_observable.subscribe(self.__send_flash),
             )
 
             return True
         except:
             traceback.print_exc()
             return False
+
+    def __send_flash(self, intensity: float):
+        if self.left_connection is None or self.right_connection is None:
+            return
+
+        _ = self.__executor.submit(self.left_connection.flashlight, intensity)
+        _ = self.__executor.submit(self.right_connection.flashlight, intensity)
 
     def __send_image(
         self,
@@ -184,8 +194,8 @@ class UmgvBridge(DisposableBase):
                 left = -speed
                 right = (1 - x) * -speed
 
-        _ = self.__executor.submit(self.left_connection.motor, left)
-        _ = self.__executor.submit(self.right_connection.motor, right)
+        _ = self.__executor.submit(self.left_connection.motor, left * scaler)
+        _ = self.__executor.submit(self.right_connection.motor, right * scaler)
 
     @property
     def left_transform(self) -> Observer[Optional[Callable[[MatLike], MatLike]]]:
@@ -194,6 +204,12 @@ class UmgvBridge(DisposableBase):
     @property
     def right_transform(self) -> Observer[Optional[Callable[[MatLike], MatLike]]]:
         return self.__right_transform
+
+    def toggle_flashlight(self):
+        if self.flash.value > 0.01:
+            self.flash.on_next(0.0)
+        else:
+            self.flash.on_next(0.5)
 
     @override
     def dispose(self) -> None:

@@ -164,6 +164,7 @@ esp_err_t flashHandler(httpd_req_t *req) {
   if (httpd_query_key_value(query, "s", value, sizeof(value)) == ESP_OK) {
     uint32_t level = strtoul(value, NULL, 10);
     ledcWrite(LEDC_CHANNEL_7, level);
+    httpd_resp_sendstr(req, "Flashlight updated");
     return ESP_OK;
   }
 
