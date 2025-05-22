@@ -23,13 +23,12 @@ const frame_handler_t ws_frame_handlers[] = {
     motorHandler,
 #endif
     flashHandler,
-    ping_frame_handler,
 };
 
 #ifdef MOTOR_CONTROLS
-const size_t ws_frame_handler_count = 3;
-#else
 const size_t ws_frame_handler_count = 2;
+#else
+const size_t ws_frame_handler_count = 1;
 #endif
 
 extern const size_t ws_frame_handler_count;
@@ -60,12 +59,14 @@ httpd_handle_t startServer() {
 void setup() {
   Serial.begin(115200);
 
-  setupLedFlash(LED_GPIO_NUM);
 #ifdef MOTOR_CONTROLS
   setupMotor(DEFAULT_MOTOR);
 #endif
+  setupLedFlash(LED_GPIO_NUM);
 
+  WiFi.setSleep(false);
   WiFi.begin(ssid, password);
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");

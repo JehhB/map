@@ -21,7 +21,7 @@ Tested on `Ubuntu 20.04 Focal Fosa` with `Python 3.8.10`
     source /opt/ros/noetic/setup.bash
     source .venv/bin/activate
 
-    pip install PyOpenGL PyOpenGL-accelerate pyopengltk opencv-contrib-python pillow reactivex pygame PyYAML platformdirs pyrr rospkg req requests websockets
+    pip install PyOpenGL PyOpenGL-accelerate pyopengltk opencv-contrib-python pillow reactivex pygame PyYAML platformdirs pyrr rospkg req websocket-client
     ```
 
 3.  Run processes

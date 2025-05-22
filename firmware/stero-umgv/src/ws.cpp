@@ -54,24 +54,3 @@ esp_err_t ws_handler(httpd_req_t *req) {
 
   return ESP_OK;
 }
-
-esp_err_t ping_frame_handler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt) {
-  if (ws_pkt->type != HTTPD_WS_TYPE_PING) {
-    return ESP_FAIL;
-  }
-
-  log_i("Received ping frame");
-
-  httpd_ws_frame_t pong_frame;
-  memset(&pong_frame, 0, sizeof(httpd_ws_frame_t));
-  pong_frame.type = HTTPD_WS_TYPE_PONG;
-  pong_frame.payload = ws_pkt->payload;
-  pong_frame.len = ws_pkt->len;
-
-  esp_err_t ret = httpd_ws_send_frame(req, &pong_frame);
-  if (ret != ESP_OK) {
-    log_e("Failed to send pong frame: %d", ret);
-  }
-
-  return ESP_OK;
-}

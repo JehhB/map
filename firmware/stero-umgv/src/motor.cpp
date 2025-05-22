@@ -56,7 +56,7 @@ esp_err_t motorHandler(httpd_req_t *req, httpd_ws_frame_t *ws_pkt) {
   const uint8_t resp[] = {0};
   httpd_ws_frame_t resp_frame;
   memset(&resp_frame, 0, sizeof(httpd_ws_frame_t));
-  resp_frame.type = HTTPD_WS_TYPE_TEXT;
+  resp_frame.type = HTTPD_WS_TYPE_BINARY;
   resp_frame.payload = (uint8_t *)resp;
   resp_frame.len = 1;
 
@@ -74,13 +74,15 @@ void setupMotor(const motor_config_t &config) {
   ledcAttachPin(config.pwm, config.ledcChannel);
   ledcWrite(config.ledcChannel, 0);
 
-  gpio_config_t out_config = {
+  gpio_config_t gpio_conf = {
       .pin_bit_mask = (1ULL << config.forward) | (1ULL << config.backward),
       .mode = GPIO_MODE_OUTPUT,
       .pull_up_en = GPIO_PULLUP_DISABLE,
       .pull_down_en = GPIO_PULLDOWN_DISABLE,
+      .intr_type = GPIO_INTR_DISABLE,
   };
 
+  gpio_config(&gpio_conf);
   gpio_set_level(config.forward, 0);
   gpio_set_level(config.backward, 0);
 }
@@ -92,7 +94,7 @@ void setMotor(int8_t speed, const motor_config_t &config) {
     gpio_set_level(config.backward, 1);
   } else {
     ledcWrite(config.ledcChannel, speed * 2 + 1);
-    gpio_set_level(config.forward, 1);
     gpio_set_level(config.backward, 0);
+    gpio_set_level(config.forward, 1);
   }
 }
