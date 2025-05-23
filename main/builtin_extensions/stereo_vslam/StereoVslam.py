@@ -1,10 +1,12 @@
+# pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAny=false, reportUnknownVariableType=false
+
 import math
 import tkinter as tk
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from tkinter import messagebox
-from typing import List, Optional, Tuple, Union, cast, final
+from typing import List, Literal, Optional, Tuple, Union, final
 
 import numpy as np
 import reactivex
@@ -12,12 +14,11 @@ from cv2.typing import MatLike
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from PIL.Image import Image
-from pyrr.rectangle import width
 from reactivex import Observable, Subject, empty, operators
 from reactivex.abc import DisposableBase
 from reactivex.subject import BehaviorSubject
 from rtabmap_msgs.msg import MapGraph
-from typing_extensions import override
+from typing_extensions import TypeAlias, override
 
 from ratmap_common import AbstractEvent, ExtensionMetadata
 from ratmap_core import BaseExtension
@@ -32,6 +33,8 @@ from .Calibrator import Calibrator, CalibratorParams
 from .CameraInfo import StereoCameraInfo
 from .RosBridge import RosBridge
 from .ui import StereoVslamToolbar, StereoVslamWindow
+
+_State: TypeAlias = Literal["idle", "calibrating", "mapping", "testing"]
 
 
 class CalibratorParamsHolder:
@@ -61,9 +64,8 @@ class StereoVslam(BaseExtension):
 
     left_image_subject: Optional[Subject[Optional[Image]]]
     right_image_subject: Optional[Subject[Optional[Image]]]
-    timestamp_subject: Optional[Subject[int]]
     stereo_image_observable: Optional[
-        Observable[Tuple[Optional[Image], Optional[Image], int, bool]]
+        Observable[Tuple[Optional[Image], Optional[Image], _State]]
     ]
 
     __extension_lock: Lock
@@ -114,9 +116,8 @@ class StereoVslam(BaseExtension):
 
         self.left_image_subject = None
         self.right_image_subject = None
-        self.timestamp_subject = None
         self.stereo_image_observable = None
-        self.is_mapping = BehaviorSubject(False)
+        self.__state: BehaviorSubject[_State] = BehaviorSubject("idle")
 
         self.__calibrator_params = CalibratorParamsHolder()
         self.__inspect_subject = Subject()
@@ -148,8 +149,7 @@ class StereoVslam(BaseExtension):
 
         self.left_image_subject = Subject()
         self.right_image_subject = Subject()
-        self.timestamp_subject = Subject()
-        self.is_mapping.on_next(False)
+        self.__state.on_next("idle")
 
         self.__main_gl = self.context.main_gl
 
@@ -184,21 +184,22 @@ class StereoVslam(BaseExtension):
         self.stereo_image_observable = reactivex.combine_latest(
             self.left_image_subject,
             self.right_image_subject,
-            self.timestamp_subject,
-            self.__calibrator.is_calibrating,
-        ).pipe(operators.throttle_first(1 / StereoVslam.TARGET_FPS))
+            self.__state,
+        ).pipe(
+            operators.throttle_first(1 / StereoVslam.TARGET_FPS),
+        )
 
         safe_dispose(self.__calibrator_disposer)
         self.__calibrator_disposer = self.stereo_image_observable.pipe(
-            operators.throttle_first(0.8)
-        ).subscribe(self.__calibrator.next)
+            operators.filter(lambda v: v[2] == "calibrating"),
+            operators.throttle_first(0.8),
+        ).subscribe(self.__process_calibrator_images)
 
         safe_dispose(self.__ros_bridge_disposer)
         self.__ros_bridge_disposer = reactivex.combine_latest(
             self.stereo_image_observable,
             self.__calibrator.stereo_camera_info,
-            self.is_mapping,
-        ).subscribe(on_next=self.process_images)
+        ).subscribe(on_next=self.__process_images)
 
         self.context.extension_menu.add_command(
             label=StereoVslam.LABEL, command=self.__open_window
@@ -220,26 +221,33 @@ class StereoVslam(BaseExtension):
 
         self.reset_map()
 
-    def process_images(
-        self,
-        images: Tuple[
-            Tuple[Optional[Image], Optional[Image], int, bool],
-            Optional[StereoCameraInfo],
-            bool,
-        ],
+    def __process_calibrator_images(
+        self, images: Tuple[Optional[Image], Optional[Image], _State]
     ):
-        stereo_images, camera_info, is_mapping = images
-        if not is_mapping:
+        left_image, right_image, state = images
+
+        if state != "calibrating" or self.__calibrator is None:
             return
 
-        left_image, right_image, _timestamp, is_calibrating = stereo_images
+        _ = self.__calibrator.next(left_image, right_image)
+
+    def __process_images(
+        self,
+        images: Tuple[
+            Tuple[Optional[Image], Optional[Image], _State],
+            Optional[StereoCameraInfo],
+        ],
+    ):
+        stereo_images, camera_info = images
+
+        (left_image, right_image, state) = stereo_images
 
         if (
             left_image is None
             or right_image is None
             or camera_info is None
             or self.__ros_bridge is None
-            or is_calibrating
+            or state != "mapping"
         ):
             return
 
@@ -270,7 +278,7 @@ class StereoVslam(BaseExtension):
         safe_dispose(self.__maingl_click_disposer)
         self.__maingl_click_disposer = None
 
-        self.is_mapping.on_next(False)
+        self.__state.on_next("idle")
 
         if self.__ros_bridge:
             self.__ros_bridge.destroy()
@@ -337,25 +345,21 @@ class StereoVslam(BaseExtension):
         )
 
         def preview_image(
-            is_calibrating: bool,
+            state: _State,
         ) -> Observable[Union[MatLike, Image, None]]:
             if self.__ros_bridge is None or self.__calibrator is None:
                 return empty()
-            if is_calibrating:
+            if state == "calibrating":
                 return self.__calibrator.left_image_with_drawing
             return self.__ros_bridge.disparity_image_observable
 
-        self.__extension_window.disparity_image_observable = (
-            self.__calibrator.is_calibrating.pipe(
-                operators.map(preview_image), operators.switch_latest()
-            )
+        self.__extension_window.disparity_image_observable = self.__state.pipe(
+            operators.map(preview_image), operators.switch_latest()
         )
         self.__extension_window.left_image_observable = self.left_image_subject
         self.__extension_window.right_image_observable = self.right_image_subject
 
-        self.__extension_window.is_calibrating_observable = (
-            self.__calibrator.is_calibrating
-        )
+        self.__extension_window.is_calibrating_observable = self.is_calibrating
 
         self.__extension_window.calibration_count_observable = (
             self.__calibrator.number_of_samples
@@ -410,13 +414,13 @@ class StereoVslam(BaseExtension):
         if self.__calibrator is None:
             return
 
-        self.__calibrator.pause()
+        self.__state.on_next("idle")
 
     def reset_calibration(self, _event: AbstractEvent):
         if self.__calibrator is None:
             return
 
-        self.__calibrator.reset()
+        self.__state.on_next("idle")
 
     def update_calibration(self, _event: AbstractEvent):
         if self.__calibrator is None:
@@ -431,7 +435,7 @@ class StereoVslam(BaseExtension):
             _ = self.__calibration_executor.submit(self.__calibrator.update_calibration)
 
     def __disparity_hover_handler(self, event: AbstractEvent):
-        if self.__calibrator is not None and self.__calibrator.is_calibrating.value:
+        if self.__state.value != "mapping":
             return
 
         if self.__ros_bridge is None:
@@ -466,7 +470,7 @@ class StereoVslam(BaseExtension):
             self.__calibrator_params.square_size.on_next(params["square_size"])
         if self.__calibrator:
             self.__calibrator.start(self.__calibrator_params.getParams())
-        self.is_mapping.on_next(False)
+        self.__state.on_next("mapping")
 
     def reset_map(self):
         if self.__ros_bridge:
@@ -651,9 +655,7 @@ class StereoVslam(BaseExtension):
 
     def start_mapping(self) -> None:
         self.reset_map()
-        if self.calibrator is not None:
-            self.calibrator.stop()
-        self.is_mapping.on_next(True)
+        self.__state.on_next("mapping")
 
     @property
     def extension_lock(self):
@@ -770,3 +772,15 @@ class StereoVslam(BaseExtension):
             )
 
         self.__main_gl.update_mesh(self.__plan_mesh, draw_plan)
+
+    @property
+    def state(self) -> Observable[_State]:
+        return self.__state
+
+    @property
+    def is_mapping(self) -> Observable[bool]:
+        return self.__state.pipe(operators.map(lambda v: v == "mapping"))
+
+    @property
+    def is_calibrating(self) -> Observable[bool]:
+        return self.__state.pipe(operators.map(lambda v: v == "calibrating"))

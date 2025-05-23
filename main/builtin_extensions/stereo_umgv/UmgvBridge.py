@@ -37,7 +37,6 @@ class UmgvBridge(DisposableBase):
         self,
         left_image_observer: Optional[Observer[Optional[Image.Image]]],
         right_image_observer: Optional[Observer[Optional[Image.Image]]],
-        timestamp_observer: Optional[Observer[int]],
     ) -> None:
         self.x_subject = BehaviorSubject(0.0)
         self.y_subject = BehaviorSubject(0.0)
@@ -49,7 +48,6 @@ class UmgvBridge(DisposableBase):
 
         self.__left_image_observer = left_image_observer
         self.__right_image_observer = right_image_observer
-        self.__timestamp_observer = timestamp_observer
 
         self.__left_transform = BehaviorSubject(None)
         self.__right_transform = BehaviorSubject(None)
@@ -140,16 +138,11 @@ class UmgvBridge(DisposableBase):
         if right_image is None or left_image is None:
             return
 
-        if (
-            self.__right_image_observer is None
-            or self.__left_image_observer is None
-            or self.__timestamp_observer is None
-        ):
+        if self.__right_image_observer is None or self.__left_image_observer is None:
             raise RuntimeError("Observers are unexpectedly not initialized")
 
         self.__send_image(right_image, right_transform, self.__right_image_observer)
         self.__send_image(left_image, left_transform, self.__left_image_observer)
-        self.__timestamp_observer.on_next(int(time() * 1e9))
 
     def __send_motor(self, state: Tuple[float, float, float]):
         if self.left_connection is None or self.right_connection is None:

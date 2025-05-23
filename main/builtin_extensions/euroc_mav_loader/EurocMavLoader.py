@@ -119,7 +119,9 @@ class EurocMavLoader(BaseExtension):
         if calibrator is None or left_image_base is None or right_image_base is None:
             raise RuntimeError("Stereo VSLAM extension is not running properly")
 
-        left_image = calibrator.is_calibrating.pipe(
+        is_calibrating = self.stereo_vslam.is_calibrating
+
+        left_image = is_calibrating.pipe(
             operators.map(
                 lambda is_calibrating: (
                     calibrator.left_image_with_drawing
@@ -130,7 +132,7 @@ class EurocMavLoader(BaseExtension):
             operators.switch_latest(),
         )
 
-        right_image = calibrator.is_calibrating.pipe(
+        right_image = is_calibrating.pipe(
             operators.map(
                 lambda is_calibrating: (
                     calibrator.right_image_with_drawing
@@ -181,15 +183,12 @@ class EurocMavLoader(BaseExtension):
         self.__player = Player(images)
 
         def update_images(inp: Tuple[MatLike, MatLike, Metadata]):
-            left, right, meta = inp
+            left, right, _meta = inp
             if self.stereo_vslam.left_image_subject is not None:
                 self.stereo_vslam.left_image_subject.on_next(fromarray(left))
 
             if self.stereo_vslam.right_image_subject is not None:
                 self.stereo_vslam.right_image_subject.on_next(fromarray(right))
-
-            if self.stereo_vslam.timestamp_subject is not None:
-                self.stereo_vslam.timestamp_subject.on_next(meta["timestamp"])
 
         def update_player_state(state: PlayerState):
             if self.__extension_window is not None:

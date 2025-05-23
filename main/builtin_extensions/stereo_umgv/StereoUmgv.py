@@ -3,7 +3,7 @@ import traceback
 from tkinter import messagebox
 from typing import TYPE_CHECKING, Optional, Tuple, cast, final
 
-from reactivex import observable, operators
+from reactivex import operators
 from reactivex.abc import DisposableBase
 from reactivex.subject import BehaviorSubject
 from typing_extensions import override
@@ -112,7 +112,6 @@ class StereoUmgv(BaseExtension):
         self.umgv_bridge = UmgvBridge(
             self.stereo_vslam.left_image_subject,
             self.stereo_vslam.right_image_subject,
-            self.stereo_vslam.timestamp_subject,
         )
         scale: float = self.context.config.get(
             f"{self.config_namespace}.scaler", default=1.0
@@ -252,7 +251,8 @@ class StereoUmgv(BaseExtension):
         if calibrator is None or left_image_base is None or right_image_base is None:
             raise RuntimeError("Stereo VSLAM extension is not running properly")
 
-        left_image = calibrator.is_calibrating.pipe(
+        is_calibrating = self.stereo_vslam.is_calibrating
+        left_image = is_calibrating.pipe(
             operators.map(
                 lambda is_calibrating: (
                     calibrator.left_image_with_drawing
@@ -263,7 +263,7 @@ class StereoUmgv(BaseExtension):
             operators.switch_latest(),
         )
 
-        right_image = calibrator.is_calibrating.pipe(
+        right_image = is_calibrating.pipe(
             operators.map(
                 lambda is_calibrating: (
                     calibrator.right_image_with_drawing
@@ -291,7 +291,7 @@ class StereoUmgv(BaseExtension):
         self.__extension_window.left_image_observable = left_image
         self.__extension_window.right_image_observable = right_image
 
-        self.__extension_window.is_calibrating_observable = calibrator.is_calibrating
+        self.__extension_window.is_calibrating_observable = is_calibrating
 
         self.__extension_window.calibration_count_observable = (
             calibrator.number_of_samples

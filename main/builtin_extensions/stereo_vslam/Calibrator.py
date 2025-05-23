@@ -1,3 +1,4 @@
+from optparse import Option
 from typing import List, Optional, Tuple, TypedDict
 
 import cv2
@@ -24,8 +25,6 @@ class Calibrator:
     objpoints: List[MatLike]
     imgpoints_left: List[MatLike]
     imgpoints_right: List[MatLike]
-
-    is_calibrating: BehaviorSubject[bool]
 
     number_of_samples: BehaviorSubject[int]
     left_image_with_drawing: Subject[Image.Image]
@@ -54,7 +53,6 @@ class Calibrator:
         self.imgpoints_left = []
         self.imgpoints_right = []
 
-        self.is_calibrating = BehaviorSubject(False)
         self.number_of_samples = BehaviorSubject(0)
         self.stereo_camera_info = BehaviorSubject(None)
         self.left_image_with_drawing = Subject()
@@ -77,14 +75,10 @@ class Calibrator:
         ].T.reshape(-1, 2)
         self.objp *= self.square_size
 
-        self.is_calibrating.on_next(True)
         self.stereo_camera_info.on_next(None)
 
-    def stop(self):
-        self.is_calibrating.on_next(False)
-
     def next(
-        self, images: Tuple[Optional[Image.Image], Optional[Image.Image], int, bool]
+        self, left_image: Optional[Image.Image], right_image: Optional[Image.Image]
     ):
         """
         Process a new pair of stereo images for calibration.
@@ -96,11 +90,6 @@ class Calibrator:
         Returns:
             bool: True if corners found in both images, False otherwise
         """
-        left_image, right_image, _timestamp, _is_calibrating = images
-
-        if not self.is_calibrating.value:
-            return
-
         if left_image is None or right_image is None:
             return
 
@@ -115,7 +104,7 @@ class Calibrator:
         elif self.img_shape != left_cv.shape[:2]:
             raise RuntimeError("Img shape does not match previous shape")
 
-        _ = self._process_image_pair(left_cv, right_cv)
+        return self._process_image_pair(left_cv, right_cv)
 
     def __pil_to_cv(self, pil_image: Image.Image):
         """Convert PIL Image to OpenCV format."""
@@ -290,9 +279,6 @@ class Calibrator:
             error=error,
         )
 
-    def resume(self):
-        self.is_calibrating.on_next(True)
-
     def reset(self):
         """Reset the calibrator to start fresh."""
         self.objpoints = []
@@ -300,11 +286,7 @@ class Calibrator:
         self.imgpoints_right = []
         self.img_shape = None
         self.number_of_samples.on_next(0)
-        self.is_calibrating.on_next(False)
         self.stereo_camera_info.on_next(None)
-
-    def pause(self):
-        self.is_calibrating.on_next(False)
 
     def save(self, file_name: str) -> bool:
         yaml_dump = self.get_calibration_info()
