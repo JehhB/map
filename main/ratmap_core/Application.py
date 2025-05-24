@@ -110,6 +110,9 @@ class Application(EventTarget):
             self.add_event_listener(
                 "activate.menu_main.navigate.recenter", lambda e: recenter()
             ),
+            self.add_event_listener(
+                "activate.menu_main.edit.export_map", self.__save_map
+            ),
             disposable_bind(
                 self.main_window, "<Control-plus>", lambda e: zoom(-zoom_sensitivity)
             ),
@@ -246,3 +249,13 @@ class Application(EventTarget):
             return
 
         self.__main_gl.camera.pan(-offsets[0], offsets[1], delta_time=0.5)
+
+    def __save_map(self, _event: AbstractEvent):
+        filename = filedialog.asksaveasfilename(
+            parent=self.__main_window,
+            title="Save calibration info",
+            filetypes=[("Images", [".png", "*.jpg", "*.jpeg"])],
+            defaultextension=".jpg",
+        )
+
+        self.__main_gl.export_image(filename)

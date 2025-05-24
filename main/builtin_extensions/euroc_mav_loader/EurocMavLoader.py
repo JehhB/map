@@ -40,7 +40,7 @@ class EurocMavLoader(BaseExtension):
         return {
             "id": "euroc_mav_loader",
             "title": "ASL Dataset Loader",
-            "description": "An extension to load Autonomous Systems Lab (ASB) Dataset to be used for Stereo VSLAM",
+            "description": "An extension to load Autonomous Systems Lab (ASL) Dataset to be used for Stereo VSLAM",
             "dependency": ["stereo_vslam"],
         }
 

@@ -7,6 +7,7 @@ from threading import RLock
 from typing import Callable, List, Literal, Optional, Tuple, final
 
 from OpenGL import GL
+from PIL import Image
 from pyopengltk import OpenGLFrame
 from pyrr import Vector3
 from typing_extensions import override
@@ -266,3 +267,15 @@ class MainGl(OpenGLFrame):
 
     def __release_hold(self, _e: tk.Event[tk.Misc]):
         self.__last_clicked = None
+
+    def export_image(self, path: str):
+        def capture():
+            GL.glPixelStorei(GL.GL_PACK_ALIGNMENT, 1)
+            w: int = self.width
+            h: int = self.height
+            data = GL.glReadPixels(0, 0, w, h, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
+            image: Image.Image = Image.frombytes("RGB", (w, h), data)
+            image = image.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+            image.save(path)
+
+        _ = self.after(0, capture)
