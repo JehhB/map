@@ -5,10 +5,9 @@ import tkinter as tk
 from typing_extensions import override
 
 from ratmap_common import EventTarget
-from tkinter_rx import Frame, Notebook
+from tkinter_rx import Frame, Label, Notebook
 from tkinter_rx.util import SetDisposer, bind_recursive, disposable_bind
 
-from .Legends import Legends
 from .MainGl import MainGl
 from .MenuMain import MenuMain
 
@@ -42,7 +41,8 @@ class MainWindow(tk.Tk):
 
         self.__gl_frame.grid(row=0, column=0, sticky=tk.NSEW)
 
-        self.__legends = Legends(self.__gl_frame)
+        self.__legends = Frame(self.__gl_frame)
+        Label(self.__legends, text="Legends").pack(side=tk.TOP, pady=4)
 
         self.__toolbar = Notebook(self, width=320)
 
@@ -101,6 +101,10 @@ class MainWindow(tk.Tk):
     @property
     def gl_frame(self):
         return self.__gl_frame
+
+    @property
+    def legends(self):
+        return self.__legends
 
     @property
     def toolbar(self):

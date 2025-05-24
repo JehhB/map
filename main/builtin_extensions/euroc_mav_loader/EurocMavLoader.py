@@ -26,7 +26,7 @@ _DEFAULT_CAMERA_INFO = os.path.join(_EXTENSION_FOLDER, "cam_info_euroc.yaml")
 
 @final
 class EurocMavLoader(BaseExtension):
-    LABEL = "EuRoC MAV Loader"
+    LABEL = "ASL Dataset Loader"
 
     __loader: Optional[DatasetLoader]
     __player: Optional[Player[Tuple[MatLike, MatLike, Metadata]]]
@@ -39,8 +39,8 @@ class EurocMavLoader(BaseExtension):
     def metadata(self) -> ExtensionMetadata:
         return {
             "id": "euroc_mav_loader",
-            "title": "EuRoC MAV Loader",
-            "description": "An extension to load EuRoC MAV Dataset to be used for Stereo VSLAM",
+            "title": "ASL Dataset Loader",
+            "description": "An extension to load Autonomous Systems Lab (ASB) Dataset to be used for Stereo VSLAM",
             "dependency": ["stereo_vslam"],
         }
 
@@ -144,6 +144,7 @@ class EurocMavLoader(BaseExtension):
         )
 
         self.__extension_window = EurocMavLoaderWindow(main_window)
+        self.__extension_window.title(EurocMavLoader.LABEL)
         self.__extension_window.update_player_state(None)
         self.__extension_window.protocol("WM_DELETE_WINDOW", self.__close_window)
         self.__extension_window.event_target.parent = self

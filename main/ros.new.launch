@@ -24,7 +24,7 @@
             <param name="P2" type="double" value="400.0" />
             <param name="correlation_window_size" type="int" value="5" />
             <param name="disp12MaxDiff" type="int" value="2" />
-            <param name="disparity_range" type="int" value="112" />
+            <param name="disparity_range" type="int" value="160" />
             <param name="min_disparity" type="int" value="0" />
             <param name="prefilter_cap" type="int" value="6" />
             <param name="prefilter_size" type="int" value="79" />
@@ -77,7 +77,7 @@
 
 
     <node pkg="rtabmap_odom" type="stereo_odometry" name="stereo_odometry" output="screen">
-       <remap from="left/image_rect"       to="/stereo_camera/left/image_rect_color"/>
+       <remap from="left/image_rect"       to="/stereo_camera/left/image_rect"/>
        <remap from="right/image_rect"      to="/stereo_camera/right/image_rect"/>
        <remap from="left/camera_info"      to="/stereo_camera/left/camera_info_throttle"/>
        <remap from="right/camera_info"     to="/stereo_camera/right/camera_info_throttle"/>
@@ -90,16 +90,18 @@
        <param name="subscribe_rgbd"  type="bool" value="false"/>
        <param name="publish_null_when_lost" value="false"/>
 
-       <param name="Odom/Strategy"      type="string" value="0"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
+       <param name="Odom/Strategy"      type="string" value="1"/> <!-- 0=Frame-to-Map, 1=Frame=to=Frame -->
        <param name="Odom/ResetCountdown" value="1"/>
+       <param name="Odom/Holonomic" value="false"/>
        <param name="Vis/EstimationType" type="string" value="1"/> <!-- 0=3D->3D 1=3D->2D (PnP) -->
        <param name="Vis/MaxDepth"       type="string" value="0"/>
        <param name="Odom/GuessMotion" type="string" value="true"/>
-       <param name="Vis/MinInliers"     type="string" value="10"/>
+       <param name="Vis/MinInliers"     type="string" value="5"/>
        <param name="OdomF2M/MaxSize"    type="string" value="1000"/>
        <param name="GFTT/MinDistance"   type="string" value="10"/>
-       <param name="GFTT/QualityLevel"  type="string" value="0.00001"/>
-       <param name="GFTT/QualityLevel"  type="string" value="0.00001"/>
+       <param name="GFTT/QualityLevel"  type="string" value="0.001"/>
+       <param name="Stereo/DenseStrategy" type="string" value="1" />
+       <param name="Stereo/MaxDisparity" type="string" value="160" />
        <param name="Reg/Force3DoF"    value="true" />
     </node>
 
@@ -109,7 +111,7 @@
        <param name="subscribe_rgbd"      type="bool" value="false"/>
        <param name="use_action_for_goal" type="bool" value="true"/>
 
-       <remap from="left/image_rect"   to="/stereo_camera/left/image_rect_color"/>
+       <remap from="left/image_rect"   to="/stereo_camera/left/image_rect"/>
        <remap from="right/image_rect"  to="/stereo_camera/right/image_rect"/>
        <remap from="left/camera_info"  to="/stereo_camera/left/camera_info_throttle"/>
        <remap from="right/camera_info" to="/stereo_camera/right/camera_info_throttle"/>
@@ -139,7 +141,7 @@
        <param name="StereoSGBM/BlockSize" type="string" value="5" />
        <param name="StereoSGBM/Disp12MaxDiff" type="string" value="2" />
        <param name="StereoSGBM/MinDisparity" type="string" value="0" />
-       <param name="StereoSGBM/NumDisparities" type="string" value="112" />
+       <param name="StereoSGBM/NumDisparities" type="string" value="160" />
        <param name="StereoSGBM/P1" type="string" value="200" />
        <param name="StereoSGBM/P2" type="string" value="400" />
        <param name="StereoSGBM/PreFilterCap" type="string" value="31" />
@@ -147,4 +149,6 @@
        <param name="StereoSGBM/SpeckleWindowSize" type="string" value="79" />
        <param name="StereoSGBM/UniquenessRatio" type="string" value="10" />
     </node>
+
+ 
 </launch>

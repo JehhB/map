@@ -11,7 +11,7 @@ from typing import List, Literal, Optional, Tuple, Union, final
 import numpy as np
 import reactivex
 from cv2.typing import MatLike
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from PIL.Image import Image
 from reactivex import Observable, Subject, empty, operators
@@ -32,7 +32,7 @@ from tkinter_rx.util import safe_dispose
 from .Calibrator import Calibrator, CalibratorParams
 from .CameraInfo import StereoCameraInfo
 from .RosBridge import RosBridge
-from .ui import StereoVslamToolbar, StereoVslamWindow
+from .ui import StereoVslamLegends, StereoVslamToolbar, StereoVslamWindow
 
 _State: TypeAlias = Literal["idle", "calibrating", "mapping", "testing"]
 
@@ -87,6 +87,8 @@ class StereoVslam(BaseExtension):
     __set_target_mesh: int
     __out_target_mesh: int
 
+    __legends: Optional[StereoVslamLegends]
+
     @property
     @override
     def metadata(self) -> ExtensionMetadata:
@@ -111,6 +113,7 @@ class StereoVslam(BaseExtension):
         self.__out_target_mesh = -1
         self.__maingl_click_disposer = None
         self.__toolbar = None
+        self.__legends = None
 
         self.__extension_lock = Lock()
 
@@ -118,6 +121,7 @@ class StereoVslam(BaseExtension):
         self.right_image_subject = None
         self.stereo_image_observable = None
         self.__state: BehaviorSubject[_State] = BehaviorSubject("idle")
+        self.__poses: BehaviorSubject[List[Pose]] = BehaviorSubject([])
 
         self.__calibrator_params = CalibratorParamsHolder()
         self.__inspect_subject = Subject()
@@ -150,6 +154,10 @@ class StereoVslam(BaseExtension):
         self.left_image_subject = Subject()
         self.right_image_subject = Subject()
         self.__state.on_next("idle")
+        self.__poses.on_next([])
+
+        self.__legends = StereoVslamLegends(self.context.main_window.legends)
+        self.__legends.pack(side=tk.TOP, expand=tk.YES, fill=tk.X)
 
         self.__main_gl = self.context.main_gl
 
@@ -262,6 +270,10 @@ class StereoVslam(BaseExtension):
 
     @override
     def stop(self) -> None:
+        if self.__legends:
+            self.__legends.pack_forget()
+            self.__legends.destroy()
+        self.__legends = None
 
         safe_dispose(self.left_image_subject)
         self.left_image_subject = None
@@ -420,6 +432,7 @@ class StereoVslam(BaseExtension):
         if self.__calibrator is None:
             return
 
+        self.__calibrator.reset()
         self.__state.on_next("idle")
 
     def update_calibration(self, _event: AbstractEvent):
@@ -470,7 +483,7 @@ class StereoVslam(BaseExtension):
             self.__calibrator_params.square_size.on_next(params["square_size"])
         if self.__calibrator:
             self.__calibrator.start(self.__calibrator_params.getParams())
-        self.__state.on_next("mapping")
+        self.__state.on_next("calibrating")
 
     def reset_map(self):
         if self.__ros_bridge:
@@ -594,13 +607,17 @@ class StereoVslam(BaseExtension):
             vertices = np.array(
                 [
                     [p.position.x, p.position.y, p.position.z, 0.0, 0.0, 1.0]
-                    for p in graph.poses
+                    for p in (graph.poses if graph.poses is not None else [])
                 ],
                 dtype=np.float32,
             )
 
-            if len(graph.poses) > 0:
-                last_pose = graph.poses[-1]
+            if graph.poses is not None:
+                self.__poses.on_next(graph.poses)
+
+            if graph.poses is not None and len(graph.poses) > 0:
+                last_pose: Pose = graph.poses[-1]
+
                 qx = last_pose.orientation.x
                 qy = last_pose.orientation.y
                 qz = last_pose.orientation.z
@@ -609,10 +626,6 @@ class StereoVslam(BaseExtension):
                 # Calculate forward vector (x-axis direction in local frame)
                 forward_x = 1 - 2 * (qy * qy + qz * qz)
                 forward_y = 2 * (qx * qy + qw * qz)
-                forward_z = 2 * (qx * qz - qw * qy)
-
-                # Project onto x-y plane by zeroing z component
-                forward_z = 0
 
                 # Recalculate magnitude after projection
                 magnitude = np.sqrt(forward_x * forward_x + forward_y * forward_y)
@@ -784,3 +797,18 @@ class StereoVslam(BaseExtension):
     @property
     def is_calibrating(self) -> Observable[bool]:
         return self.__state.pipe(operators.map(lambda v: v == "calibrating"))
+
+    @property
+    def position(self) -> Observable[Tuple[float, float]]:
+        def get_position(poses: List[Pose]) -> Tuple[float, float]:
+            if len(poses) <= 0:
+                return (0.0, 0.0)
+
+            last_pose = poses[-1]
+            return (last_pose.position.x, last_pose.position.y)
+
+        return self.__poses.pipe(operators.map(get_position))
+
+    @property
+    def poses(self):
+        return self.__poses

@@ -172,6 +172,7 @@ class StereoUmgv(BaseExtension):
                 right_image_observable=self.stereo_vslam.right_image_subject,
                 x_subject=self.umgv_bridge.x_subject,
                 y_subject=self.umgv_bridge.y_subject,
+                flash_subject=self.umgv_bridge.flash,
             )
             self.__toolbar.event_target.parent = self
             self.context.toolbar.add(self.__toolbar, text=StereoUmgv.LABEL)

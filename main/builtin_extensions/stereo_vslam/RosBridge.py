@@ -121,6 +121,9 @@ class RosBridge(EventTarget):
         img_np = np.array(img)
         if len(img_np.shape) != 2:
             img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
+        img_np = cv2.bilateralFilter(img_np, 5, 30, 30)
+        img_np = cv2.GaussianBlur(img_np, (3, 3), 1.0)
+
         return self.bridge.cv2_to_imgmsg(img_np, encoding="mono8")
 
     def __caminfo_to_caminfomsg(self, info: CameraInfo) -> CameraInfoRos:

@@ -27,8 +27,6 @@ class EurocMavLoaderWindow(tk.Toplevel):
     ) -> None:
         super().__init__(master)
 
-        self.title("EuRoC MAV Loader")
-
         self.folder_path = BehaviorSubject("")
 
         self.__event_target = EventTarget()
